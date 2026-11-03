@@ -1,0 +1,10 @@
+{"version": 2, "width": 100, "height": 30, "timestamp": 1793731398, "title": "Codex to an API", "env": {"TERM": "xterm-256color"}}
+[0.0, "o", "$ ./demo/run.sh\r\n"]
+[0.078, "o", "Building h2a…\r\n"]
+[1.403, "o", "\r\nLIVE CODEX — uses your existing harness login\r\nModel: codex/default\r\n"]
+[1.642, "o", "Created an isolated, model-scoped key (secret hidden).\r\n"]
+[1.651, "o", "Gateway ready on loopback.\r\n\r\n"]
+[1.652, "o", "No key → HTTP 401\r\n\r\nStreaming answer:\r\n"]
+[6.425, "o", "An API gateway provides a single entry point to manage routing, security, and traffic across multiple services."]
+[7.537, "o", "\r\n"]
+[7.556, "o", "\r\nRevoked key → HTTP 401\r\nDone. Gateway and temporary key store are being removed.\r\n"]

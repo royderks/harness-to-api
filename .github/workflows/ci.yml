@@ -12,8 +12,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.x'
+          go-version: 'stable'
           cache: false
       - run: go vet ./...
       - run: go test -race ./...
-      - run: go build -o h2a ./cmd/h2a
+      - run: go build -o bin/h2a ./cmd/h2a
+      - name: Run offline demo
+        if: runner.os != 'Windows'
+        shell: bash
+        run: H2A_BIN="$PWD/bin/h2a" ./demo/run.sh --fixture

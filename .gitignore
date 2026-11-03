@@ -5,3 +5,6 @@ node_modules/
 .env*
 .harness-to-api/
 coverage.out
+
+__pycache__/
+*.pyc

@@ -1,0 +1,16 @@
+$ ./demo/run.sh --provider antigravity
+Building h2a…
+
+LIVE ANTIGRAVITY — uses your existing harness login
+Model: antigravity/default
+Created an isolated, model-scoped key (secret hidden).
+Gateway ready on loopback.
+
+No key → HTTP 401
+
+Streaming answer:
+An API gateway is useful because it provides a single entry point to manage, secure, and route client requests across multiple backend services.
+
+
+Revoked key → HTTP 401
+Done. Gateway and temporary key store are being removed.

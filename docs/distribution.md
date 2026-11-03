@@ -13,7 +13,7 @@ Inference: use a native binary as the implementation artifact and offer familiar
 
 ## First release
 
-The repository includes builds for macOS, Linux, and Windows on arm64 and amd64, with versioned archives and SHA-256 checksums. Start with GitHub Releases and a concise, working quickstart. Publish only after choosing the repository owner/name and validating a live Antigravity installation. The local module name is `harness-to-api`; change it to the canonical repository path before offering `go install` from GitHub.
+The repository includes builds for macOS, Linux, and Windows on arm64 and amd64, with versioned archives and SHA-256 checksums. Start with GitHub Releases and a concise, working quickstart. Live Codex and Antigravity demos have passed. Choose the repository owner/name before publishing. The local module name is `harness-to-api`; change it to the canonical repository path before offering `go install` from GitHub.
 
 Follow with:
 

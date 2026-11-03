@@ -12,8 +12,11 @@ for platform in darwin/arm64 darwin/amd64 linux/arm64 linux/amd64 windows/arm64 
   executable=h2a
   if [ "$target_os" = windows ]; then executable=h2a.exe; fi
   CGO_ENABLED=0 GOOS="$target_os" GOARCH="$target_arch" go build -trimpath -ldflags "-s -w -X main.version=$version" -o "$folder/$executable" ./cmd/h2a
-  cp LICENSE README.md "$folder/"
+  cp LICENSE README.md CONTRIBUTING.md "$folder/"
   cp -R docs examples "$folder/"
+  mkdir -p "$folder/demo" "$folder/scripts"
+  cp demo/*.py demo/*.sh "$folder/demo/"
+  cp scripts/record-demo.py "$folder/scripts/"
   tar -czf "dist/$name.tar.gz" -C "$folder" .
 done
 cd dist

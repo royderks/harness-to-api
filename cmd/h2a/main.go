@@ -28,16 +28,22 @@ var version = "dev"
 const help = `h2a — Your coding harness, as an authenticated OpenAI-compatible API.
 
 Usage:
+  h2a doctor
   h2a keys create [--name local] [--models 'codex/*'] [--state-dir PATH]
   h2a keys list [--state-dir PATH]
   h2a keys revoke [--state-dir PATH] KEY_ID
   h2a serve [--provider codex|antigravity|all] [--port 8787]
-  h2a doctor
   h2a share [--via tailscale|funnel|cloudflare] [--port 8787]
   h2a version
 
-Create a key, sign in to the official harness CLI, then run h2a serve.
-Use h2a <command> --help for flags. API keys are printed once to stdout.
+Get started:
+  1. Install and sign in to an official harness CLI (for Codex: codex login).
+  2. export OPENAI_API_KEY="$(h2a keys create --name local --models 'codex/*')"
+  3. h2a serve --provider codex
+  4. Point your OpenAI client at http://127.0.0.1:8787/v1.
+
+Use h2a <command> --help for flags. A new API key is printed once to stdout;
+save it securely. Set HARNESS_API_STATE_DIR to choose where key hashes are stored.
 `
 
 func stateDefault() string {
@@ -50,7 +56,14 @@ func stateDefault() string {
 	}
 	return filepath.Join(home, ".harness-to-api")
 }
-func flags(name string) *flag.FlagSet { return flag.NewFlagSet(name, flag.ContinueOnError) }
+func flags(name string) *flag.FlagSet {
+	f := flag.NewFlagSet(name, flag.ContinueOnError)
+	f.Usage = func() {
+		fmt.Fprintf(f.Output(), "Usage: h2a %s [flags]\n\nFlags:\n", name)
+		f.PrintDefaults()
+	}
+	return f
+}
 func parse(f *flag.FlagSet, args []string) error {
 	if err := f.Parse(args); err != nil {
 		return err
@@ -72,10 +85,27 @@ func run(args []string) error {
 		return nil
 	}
 	switch args[0] {
-	case "help", "--help", "-h":
+	case "help":
+		if len(args) > 1 {
+			switch args[1] {
+			case "serve", "keys", "doctor", "share":
+				return run(append(append([]string{}, args[1:]...), "--help"))
+			default:
+				return fmt.Errorf("unknown help topic %q; run h2a --help", args[1])
+			}
+		}
+		fmt.Print(help)
+		return nil
+	case "--help", "-h":
+		if len(args) != 1 {
+			return errors.New("usage: h2a --help or h2a help COMMAND")
+		}
 		fmt.Print(help)
 		return nil
 	case "version", "--version":
+		if len(args) != 1 {
+			return errors.New("usage: h2a version")
+		}
 		fmt.Println(version)
 		return nil
 	case "keys":
@@ -91,13 +121,26 @@ func run(args []string) error {
 	}
 }
 func keyCommand(args []string) error {
-	if len(args) == 0 {
-		return errors.New("use keys create, list, or revoke")
+	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+		fmt.Fprintln(os.Stderr, "Usage: h2a keys <create|list|revoke> [flags]\n\nCreate prints a secret once; list prints JSON metadata; revoke takes a key ID.\nUse h2a keys <command> --help for flags.")
+		return nil
+	}
+	if args[0] != "create" && args[0] != "list" && args[0] != "revoke" {
+		return fmt.Errorf("unknown keys command %q; use h2a keys --help", args[0])
 	}
 	f := flags("keys " + args[0])
+	if args[0] == "revoke" {
+		f.Usage = func() {
+			fmt.Fprintln(f.Output(), "Usage: h2a keys revoke [flags] KEY_ID\n\nFlags:")
+			f.PrintDefaults()
+		}
+	}
 	state := f.String("state-dir", stateDefault(), "directory for hashed API keys")
-	name := f.String("name", "default", "key label (create)")
-	models := f.String("models", "*", "comma-separated model scopes (create)")
+	name, models := "default", "*"
+	if args[0] == "create" {
+		f.StringVar(&name, "name", "default", "key label")
+		f.StringVar(&models, "models", "*", "comma-separated model scopes")
+	}
 	if err := f.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -107,7 +150,7 @@ func keyCommand(args []string) error {
 		if f.NArg() != 0 {
 			return errors.New("keys create takes flags only")
 		}
-		token, p, err := store.Create(*name, strings.Split(*models, ","))
+		token, p, err := store.Create(name, strings.Split(models, ","))
 		if err != nil {
 			return err
 		}
@@ -152,6 +195,12 @@ func serveCommand(args []string) error {
 	if *port < 1 || *port > 65535 {
 		return errors.New("port must be 1–65535")
 	}
+	if *timeout <= 0 || *timeout > time.Hour {
+		return errors.New("timeout must be greater than zero and no more than 1h")
+	}
+	if *concurrent < 1 || *concurrent > 128 {
+		return errors.New("max-concurrent must be 1–128")
+	}
 	adapters := []harness.Adapter{}
 	switch *provider {
 	case "codex":
@@ -193,8 +242,9 @@ func serveCommand(args []string) error {
 	}
 	listener, err := net.Listen("tcp", server.Addr)
 	if err != nil {
-		return err
+		return fmt.Errorf("listen on %s: %w", server.Addr, err)
 	}
+	fmt.Fprintf(os.Stderr, "Serving %s at http://%s/v1 (press Ctrl+C to stop)\n", *provider, listener.Addr())
 	logger.Info("listening", "address", listener.Addr().String(), "base_path", "/v1", "provider", *provider)
 	signals, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

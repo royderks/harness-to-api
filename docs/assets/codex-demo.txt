@@ -1,0 +1,15 @@
+$ ./demo/run.sh
+Building h2a…
+
+LIVE CODEX — uses your existing harness login
+Model: codex/default
+Created an isolated, model-scoped key (secret hidden).
+Gateway ready on loopback.
+
+No key → HTTP 401
+
+Streaming answer:
+An API gateway provides a single entry point to manage routing, security, and traffic across multiple services.
+
+Revoked key → HTTP 401
+Done. Gateway and temporary key store are being removed.
