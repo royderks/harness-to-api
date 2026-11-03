@@ -6,4 +6,6 @@ Harness adapters normalize six CLI protocols and supervise subprocess cleanup.
 
 The HTTP server supports authenticated text completions, model listing and SSE.
 
+Run `cargo build --locked --bin h2a`, then `target/debug/h2a --help` for CLI commands.
+
 Build and test with Rust 1.89 or newer. Provider access is configured separately; offline fixtures do not establish live account access.
