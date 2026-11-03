@@ -1,0 +1,2 @@
+#!/bin/sh
+exec pi -e /usr/local/lib/node_modules/pi-bob/extensions/bob.ts "$@"
