@@ -1,0 +1,23 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+      - run: go test -race ./...
+      - run: scripts/release.sh "$RELEASE_VERSION"
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+      - run: gh release create "$RELEASE_VERSION" dist/*.tar.gz dist/checksums_*.txt --verify-tag --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ github.ref_name }}

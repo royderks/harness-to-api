@@ -1,0 +1,7 @@
+/bin/
+/dist/
+node_modules/
+*.tgz
+.env*
+.harness-to-api/
+coverage.out
