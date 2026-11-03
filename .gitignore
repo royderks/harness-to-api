@@ -1,0 +1,13 @@
+/bin/
+/dist/
+node_modules/
+*.tgz
+.env*
+.harness-to-api/
+coverage.out
+
+__pycache__/
+*.pyc
+
+.DS_Store
+/target/
