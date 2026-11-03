@@ -62,3 +62,21 @@ func TestConcurrentKeys(t *testing.T) {
 		t.Fatalf("lost keys: %d, %v", len(keys), err)
 	}
 }
+
+func TestIBMBobModelScopes(t *testing.T) {
+	model := "ibm-bob/openai/gpt-oss-20b"
+	if !ModelPattern.MatchString(model) {
+		t.Fatal("slash model rejected")
+	}
+	for _, tc := range []struct {
+		scope   string
+		allowed bool
+	}{{"ibm-bob/*", true}, {model, true}, {"ibm-bob/premium", false}, {"codex/*", false}} {
+		if !scopePattern.MatchString(tc.scope) {
+			t.Fatalf("invalid scope %q", tc.scope)
+		}
+		if got := (Principal{Models: []string{tc.scope}}).Allows(model); got != tc.allowed {
+			t.Fatalf("scope %q: %v", tc.scope, got)
+		}
+	}
+}

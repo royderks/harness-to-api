@@ -31,3 +31,5 @@ h2a help
 ```
 
 For automation, `keys create` writes only the token and a newline to stdout; `keys list` writes a JSON array of key metadata to stdout, including IDs and scopes but no secrets. Successful `keys revoke` writes its confirmation to stderr. Diagnostics and flag help go to stderr; top-level help and version go to stdout. Commands exit nonzero on errors. A key grants access to the local harness under the server's OS account; model scopes do not isolate filesystem or tool access.
+
+IBM Bob uses Pi with the community `pi-bob` extension. Pass `--provider ibm-bob --pi-bob-extension /absolute/path/to/pi-bob`; use `--pi-bin PATH` if Pi is not on PATH. `--provider all` enables Codex, Antigravity, and IBM Bob and also requires the extension path. See [IBM Bob setup](ibm-bob.md).

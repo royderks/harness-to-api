@@ -1,0 +1,16 @@
+services:
+  gateway:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - gateway-state:/var/lib/h2a
+      - harness-home:/home/h2a
+    init: true
+    restart: unless-stopped
+
+volumes:
+  gateway-state:
+  harness-home:

@@ -2,9 +2,9 @@
 
 **Your coding harness. One OpenAI-compatible endpoint.**
 
-Run Codex or Antigravity behind an API key. Point an OpenAI client at it—from your laptop, a container, or a remote sandbox.
+Run Codex, Antigravity, or IBM Bob through Pi behind an API key. Point an OpenAI client at it—from your laptop, a container, or a remote sandbox.
 
-A single Go binary, with no third-party Go dependencies. End users do **not** need Go, Node, or Python to run the gateway. Install and authenticate the official harness CLI separately.
+A single Go binary, with no third-party Go dependencies. End users do **not** need Go, Node, or Python to run the gateway. Install and authenticate each harness CLI separately. IBM Bob uses the community `pi-bob` extension for Pi.
 
 **Status:** local preview. Real Codex and Antigravity requests have passed through the gateway, including a Codex request from an OpenShell sandbox. Native release archives are buildable; nothing has been published to a registry yet. The working binary is `h2a`; see the [researched name shortlist](docs/naming.md).
 
@@ -67,9 +67,13 @@ Install the [official Antigravity CLI](https://antigravity.google/docs/cli/tutor
 ./bin/h2a serve --provider antigravity
 ```
 
-Use `antigravity/default` or `antigravity/<model-slug>`. Run `agy models` for your available models. `--provider all` enables both harnesses in one server; both CLIs must be installed. Keys can allow both using `--models 'codex/*,antigravity/*'`.
+Use `antigravity/default` or `antigravity/<model-slug>`. Run `agy models` for your available models. `--provider all` enables all three adapters; Codex, Antigravity, and Pi with the Bob extension must be installed. Keys can allow both using `--models 'codex/*,antigravity/*'`.
 
-The gateway invokes supported official CLIs. It does not extract OAuth tokens or call private provider endpoints. Harness login, subscription access, model eligibility, and provider limits remain controlled by each provider. An h2a key protects this gateway; it is not an OpenAI or Google provider key.
+The gateway invokes supported harness CLIs; the IBM integration uses the explicitly installed community Pi extension. It does not extract OAuth tokens or call private provider endpoints. Harness login, subscription access, model eligibility, and provider limits remain controlled by each provider. An h2a key protects this gateway; it is not an OpenAI, Google, or IBM provider key.
+
+## IBM Bob through Pi
+
+IBM Bob is available as `--provider ibm-bob`, with models such as `ibm-bob/premium` or `ibm-bob/openai/gpt-oss-20b`. It uses [pi-bob](https://pi.dev/packages/pi-bob), a community Pi provider extension, not IBM's official Bob CLI. See [installation, login, and serving instructions](docs/ibm-bob.md). The adapter is tested against the Pi protocol; live IBM account inference has not been verified here.
 
 ## Use an OpenAI client
 
@@ -92,7 +96,7 @@ See [JavaScript](examples/client.mjs) and [Python](examples/client.py) examples.
 
 ## API and execution boundary
 
-Text chat completions, legacy completions, model discovery, and SSE streaming are implemented. See [the API contract](docs/api.md) for supported fields and errors. This is a text-completion adapter; tool calling and the full OpenAI API are not implemented.
+Text chat completions, legacy completions, model listing, and SSE streaming are implemented. See [the API contract](docs/api.md) for supported fields and errors. This is a text-completion adapter; tool calling and the full OpenAI API are not implemented.
 
 ## Keys and permissions
 
@@ -122,10 +126,16 @@ See [remote access](docs/remote-access.md) for Tailscale, named Cloudflare tunne
 
 **Execution boundary:** an API key grants access to a local harness running under the host's OS account. Fresh temporary directories and harness restrictions are not a VM boundary. Codex uses read-only mode with shell tools and hooks disabled. Antigravity uses `--sandbox` and retains its local permission configuration, which can allow tools. Use a dedicated OS account or isolated host before giving keys to clients you do not trust. Never treat model scopes as filesystem or tool scopes.
 
+## Hosting
+
+Use the native binary for local setup. For an always-on endpoint, use the included [Docker Compose recipe](docs/docker.md) on a Linux VM with persistent login and key volumes, then put a named Cloudflare Tunnel in front. No public tunnel is created by the recipe. Compose configuration is validated; the image build remains unverified because the local Docker storage returned an I/O error.
+
+[Deployment choices](docs/deployment.md) covers Cloudflare Containers and Vercel Functions, Sandbox, and Daemons. Container support alone does not preserve harness logins or key revocations across restarts and replicas.
+
 ## Operational controls
 
 ```sh
-h2a serve --provider all --port 8787 --timeout 120s --max-concurrent 4
+h2a serve --provider all --pi-bob-extension "$(npm root -g)/pi-bob" --port 8787 --timeout 120s --max-concurrent 4
 h2a doctor
 ```
 
@@ -133,7 +143,7 @@ Defaults: loopback only, a 1 MiB request limit, 8 MiB response text limit, two-m
 
 Keys and client environment secrets are excluded from the child environment. Official CLI credential locations remain accessible for login. Gateway logs include request IDs and error codes, not prompts, keys, raw subprocess diagnostics, or model output. The official harness can retain its own logs; Codex is invoked with `--ephemeral`.
 
-`--codex-bin` and `--antigravity-bin` select executable paths locally. The HTTP API cannot override executables, working directories, or command-line flags.
+`--codex-bin`, `--antigravity-bin`, and `--pi-bin` select executable paths locally. `--pi-bob-extension` selects the installed Bob package. The HTTP API cannot override executables, working directories, or command-line flags.
 
 ## Develop and release
 

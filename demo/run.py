@@ -20,12 +20,15 @@ ROOT = Path(__file__).resolve().parent.parent
 def main():
     parser = argparse.ArgumentParser(description="Run an isolated h2a authentication and streaming demo")
     parser.add_argument("--fixture", action="store_true", help="use an offline fake Codex CLI; no provider call")
-    parser.add_argument("--provider", choices=["codex", "antigravity"], default="codex")
-    parser.add_argument("--model", help="full provider/model ID (default: provider/default)")
+    parser.add_argument("--provider", choices=["codex", "antigravity", "ibm-bob"], default="codex")
+    parser.add_argument("--model", help="full provider/model ID (default: ibm-bob/premium for Bob, provider/default otherwise)")
+    parser.add_argument("--pi-bob-extension", help="absolute path to the installed pi-bob package (required for IBM Bob)")
     args = parser.parse_args()
-    model = args.model or args.provider + "/default"
+    model = args.model or ("ibm-bob/premium" if args.provider == "ibm-bob" else args.provider + "/default")
     if not model.startswith(args.provider + "/"):
         parser.error("model must match --provider")
+    if args.provider == "ibm-bob" and not args.pi_bob_extension:
+        parser.error("IBM Bob requires --pi-bob-extension /absolute/path/to/pi-bob")
     if args.fixture and args.provider != "codex":
         parser.error("the fixture only implements Codex")
     with tempfile.TemporaryDirectory(prefix="h2a-demo-") as temp:
@@ -51,6 +54,8 @@ def main():
             port = sock.getsockname()[1]
         base = f"http://127.0.0.1:{port}"
         command = [binary, "serve", "--state-dir", str(state), "--provider", args.provider, "--port", str(port)]
+        if args.provider == "ibm-bob":
+            command += ["--pi-bob-extension", args.pi_bob_extension]
         if args.fixture:
             command += ["--codex-bin", str(ROOT / "demo/fixture-codex.sh")]
         log = Path(temp) / "server.log"

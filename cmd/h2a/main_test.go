@@ -111,3 +111,16 @@ func TestHelpDoesNotRecurseAndFlagsAreScoped(t *testing.T) {
 		t.Fatalf("help serve: %v %s", err, diagnostics)
 	}
 }
+
+func TestBobRequiresExplicitPackage(t *testing.T) {
+	for _, provider := range []string{"ibm-bob", "all"} {
+		_, diagnostic, err := cli(t, "serve", "--provider", provider)
+		if err == nil || !strings.Contains(diagnostic, "--pi-bob-extension") {
+			t.Fatalf("provider %s: %s %v", provider, diagnostic, err)
+		}
+	}
+	_, diagnostic, err := cli(t, "serve", "--provider", "ibm-bob", "--pi-bob-extension", t.TempDir())
+	if err == nil || !strings.Contains(diagnostic, "extensions/bob.ts") {
+		t.Fatalf("missing package: %s %v", diagnostic, err)
+	}
+}

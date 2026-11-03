@@ -1,0 +1,3 @@
+services:
+  gateway:
+    command: ["serve", "--host", "0.0.0.0", "--port", "8787", "--provider", "ibm-bob", "--pi-bob-extension", "/usr/local/lib/node_modules/pi-bob"]

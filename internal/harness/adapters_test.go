@@ -2,6 +2,7 @@ package harness
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -88,4 +89,35 @@ func TestLiveCodex(t *testing.T) {
 	if strings.TrimSpace(text.String()) != "H2A_OK" {
 		t.Fatalf("unexpected response %q", text.String())
 	}
+}
+
+func TestIBMBob(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "gateway-secret")
+	t.Setenv("IBM_BOB_API_KEY", "bob-test-key")
+	a := IBMBob{Binary: fixture, Extension: t.TempDir()}
+	for _, model := range []string{"default", "openai/gpt-oss-20b"} {
+		t.Run(model, func(t *testing.T) {
+			var text strings.Builder
+			usage, err := a.Run(context.Background(), Request{Model: model, Prompt: "- @file $(injection)"}, func(s string) error { _, err := text.WriteString(s); return err })
+			if err != nil || text.String() != "Hello 🌍" || usage == nil || usage.PromptTokens != 5 || usage.TotalTokens != 7 {
+				t.Fatalf("text=%q usage=%+v err=%v", text.String(), usage, err)
+			}
+		})
+	}
+	for _, mode := range []string{"missing-result", "bad-json", "exit-error", "hang", "failed", "tool-event", "wrong-provider"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+			if _, err := a.Run(ctx, Request{Model: mode, Prompt: "hi"}, func(string) error { return nil }); err == nil {
+				t.Fatal("expected failure")
+			}
+		})
+	}
+	t.Run("emit failure", func(t *testing.T) {
+		want := errors.New("stop emission")
+		_, err := a.Run(context.Background(), Request{Model: "premium", Prompt: "hi"}, func(string) error { return want })
+		if !errors.Is(err, want) {
+			t.Fatalf("got %v", err)
+		}
+	})
 }

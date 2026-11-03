@@ -32,7 +32,7 @@ Usage:
   h2a keys create [--name local] [--models 'codex/*'] [--state-dir PATH]
   h2a keys list [--state-dir PATH]
   h2a keys revoke [--state-dir PATH] KEY_ID
-  h2a serve [--provider codex|antigravity|all] [--port 8787]
+  h2a serve [--provider codex|antigravity|ibm-bob|all] [--port 8787]
   h2a share [--via tailscale|funnel|cloudflare] [--port 8787]
   h2a version
 
@@ -182,13 +182,15 @@ func keyCommand(args []string) error {
 func serveCommand(args []string) error {
 	f := flags("serve")
 	state := f.String("state-dir", stateDefault(), "directory for hashed API keys")
-	provider := f.String("provider", "codex", "codex, antigravity, or all")
+	provider := f.String("provider", "codex", "codex, antigravity, ibm-bob, or all")
 	host := f.String("host", "127.0.0.1", "bind address")
 	port := f.Int("port", 8787, "HTTP port")
 	timeout := f.Duration("timeout", 2*time.Minute, "maximum request duration, e.g. 120s")
 	concurrent := f.Int("max-concurrent", 4, "maximum active harness requests")
 	codexBin := f.String("codex-bin", "codex", "official Codex executable")
 	agyBin := f.String("antigravity-bin", "agy", "official Antigravity executable")
+	piBin := f.String("pi-bin", "pi", "Pi executable")
+	bobExtension := f.String("pi-bob-extension", "", "absolute path to installed pi-bob package")
 	if err := parse(f, args); err != nil {
 		return err
 	}
@@ -207,15 +209,28 @@ func serveCommand(args []string) error {
 		adapters = append(adapters, harness.Codex{Binary: *codexBin})
 	case "antigravity":
 		adapters = append(adapters, harness.Antigravity{Binary: *agyBin})
+	case "ibm-bob":
+		adapters = append(adapters, harness.IBMBob{Binary: *piBin, Extension: *bobExtension})
 	case "all":
-		adapters = append(adapters, harness.Codex{Binary: *codexBin}, harness.Antigravity{Binary: *agyBin})
+		adapters = append(adapters, harness.Codex{Binary: *codexBin}, harness.Antigravity{Binary: *agyBin}, harness.IBMBob{Binary: *piBin, Extension: *bobExtension})
 	default:
-		return errors.New("provider must be codex, antigravity, or all")
+		return errors.New("provider must be codex, antigravity, ibm-bob, or all")
+	}
+	if *provider == "ibm-bob" || *provider == "all" {
+		if !filepath.IsAbs(*bobExtension) {
+			return errors.New("--pi-bob-extension must be an absolute path to the installed pi-bob package")
+		}
+		if info, err := os.Stat(filepath.Join(*bobExtension, "extensions", "bob.ts")); err != nil || !info.Mode().IsRegular() {
+			return errors.New("--pi-bob-extension must contain extensions/bob.ts; install pi-bob first")
+		}
 	}
 	for _, adapter := range adapters {
 		binary := *codexBin
 		if adapter.ID() == "antigravity" {
 			binary = *agyBin
+		}
+		if adapter.ID() == "ibm-bob" {
+			binary = *piBin
 		}
 		if _, err := exec.LookPath(binary); err != nil {
 			return fmt.Errorf("%s CLI not found (%s); install and sign in first", adapter.ID(), binary)
@@ -269,10 +284,11 @@ func serveCommand(args []string) error {
 }
 func doctor(args []string) error {
 	f := flags("doctor")
+	piBin := f.String("pi-bin", "pi", "Pi executable")
 	if err := parse(f, args); err != nil {
 		return err
 	}
-	for _, binary := range []string{"codex", "agy", "tailscale", "cloudflared"} {
+	for _, binary := range []string{"codex", "agy", *piBin, "tailscale", "cloudflared"} {
 		path, err := exec.LookPath(binary)
 		if err != nil {
 			fmt.Printf("%s: not installed\n", binary)
@@ -289,7 +305,7 @@ func doctor(args []string) error {
 			fmt.Printf("%s: %s\n", binary, strings.TrimSpace(string(output)))
 		}
 	}
-	fmt.Println("Login is not checked. Use codex login or an interactive agy session. Tunnels are optional.")
+	fmt.Println("Login is not checked. Use codex login or an interactive agy session. For community pi-bob, use Pi /login ibm-bob. Tunnels are optional.")
 	return nil
 }
 func share(args []string) error {

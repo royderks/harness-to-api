@@ -6,9 +6,10 @@ From the repository root, run `./demo/run.sh`. It builds h2a with Go 1.24+ unles
 ./demo/run.sh
 H2A_BIN="$PWD/bin/h2a" ./demo/run.sh --provider codex --model codex/default
 ./demo/run.sh --provider antigravity --model antigravity/default
+./demo/run.sh --provider ibm-bob --model ibm-bob/premium --pi-bob-extension "$(npm root -g)/pi-bob"
 ```
 
-Choose an available model as `--model provider/model-id`. The Antigravity run requires an installed, signed-in `agy`. The stream follows the harness's output behavior; Codex can emit a complete message at once. The demo never prints the gateway secret or passes it as a command argument. Do not run with shell tracing or record other terminals that might expose credentials.
+Choose an available model as `--model provider/model-id`. The Antigravity run requires an installed, signed-in `agy`. The IBM Bob run requires Pi with the `pi-bob` extension and its Bob login; see [IBM Bob setup](ibm-bob.md). IBM Bob has not been tested against a live account here. The stream follows the harness's output behavior; Codex can emit a complete message at once. The demo never prints the gateway secret or passes it as a command argument. Do not run with shell tracing or record other terminals that might expose credentials.
 
 To rehearse without credentials or network access:
 

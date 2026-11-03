@@ -23,3 +23,7 @@ Not verified:
 - npm/Homebrew/public release distribution: not published.
 
 The local Go toolchain was downloaded into `/tmp/h2a-go-toolchain` from go.dev and its SHA-256 was checked against the official release metadata. It was not installed globally. The official Antigravity 1.4.12 CLI was downloaded into `/tmp/h2a-antigravity-cli` and checked against its updater manifest SHA-512; it used the existing account login. The temporary OpenShell tools were checked against NVIDIA release SHA-256 files. No global harness or gateway service was installed.
+
+## IBM Bob and deployment follow-up
+
+On 2026-11-03, added the Pi-backed IBM Bob adapter. The installed Pi 1.5.0 and pi-bob 0.2.6 passed a real runtime check against a local fake IBM endpoint, with isolated configuration and test credentials. This is protocol evidence, not live IBM inference. See [IBM details](ibm-bob.md). Compose configuration validates; a Docker storage database I/O error blocked the image build. See [Docker status](docker.md). No Cloudflare or Vercel resources were provisioned.

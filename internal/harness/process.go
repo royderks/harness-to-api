@@ -24,6 +24,9 @@ func childEnvironment() []string {
 	return env
 }
 func runLines(ctx context.Context, binary string, args []string, input string, consume func([]byte) error) error {
+	return runLinesEnv(ctx, binary, args, input, childEnvironment(), consume)
+}
+func runLinesEnv(ctx context.Context, binary string, args []string, input string, env []string, consume func([]byte) error) error {
 	binary, err := exec.LookPath(binary)
 	if err != nil {
 		return fmt.Errorf("find harness: %w", err)
@@ -39,7 +42,7 @@ func runLines(ctx context.Context, binary string, args []string, input string, c
 	defer os.RemoveAll(directory)
 	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Dir = directory
-	cmd.Env = childEnvironment()
+	cmd.Env = env
 	cmd.Stdin = strings.NewReader(input)
 	cmd.Stderr = io.Discard
 	cmd.WaitDelay = 2 * time.Second

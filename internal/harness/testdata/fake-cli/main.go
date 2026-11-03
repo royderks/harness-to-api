@@ -36,6 +36,39 @@ func main() {
 		fmt.Fprintln(os.Stderr, "sensitive credentials")
 		os.Exit(1)
 	}
+	if strings.Contains(args, "--provider ibm-bob") {
+		for _, required := range []string{"--mode json", "--no-session", "--no-tools", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes", "--no-context-files", "--extension ", "--provider ibm-bob"} {
+			if !strings.Contains(args, required) {
+				os.Exit(11)
+			}
+		}
+		if os.Getenv("OPENAI_API_KEY") != "" || os.Getenv("IBM_BOB_API_KEY") != "bob-test-key" || len(input) == 0 {
+			os.Exit(12)
+		}
+		if mode == "tool-event" {
+			fmt.Println(`{"type":"tool_execution_start"}`)
+			return
+		}
+		if mode == "wrong-provider" {
+			fmt.Println(`{"type":"message_start","message":{"role":"assistant","provider":"other","model":"wrong-provider"}}`)
+			return
+		}
+		fmt.Println(`{"type":"session"}`)
+		fmt.Printf(`{"type":"message_start","message":{"role":"assistant","provider":"ibm-bob","model":%q}}`+"\n", mode)
+		fmt.Println(`{"type":"message_update","assistantMessageEvent":{"type":"thinking_delta","delta":"secret"}}`)
+		fmt.Println(`{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"Hello "}}`)
+		fmt.Println(`{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"🌍"}}`)
+		if mode == "missing-result" {
+			return
+		}
+		reason := "stop"
+		if mode == "failed" {
+			reason = "error"
+		}
+		fmt.Printf(`{"type":"message_end","message":{"role":"assistant","provider":"ibm-bob","model":%q,"stopReason":%q,"usage":{"input":3,"output":2,"cacheRead":2,"cacheWrite":0,"totalTokens":7}}}`+"\n", mode, reason)
+		fmt.Println(`{"type":"agent_end"}`)
+		return
+	}
 	codex := len(os.Args) > 1 && os.Args[1] == "exec"
 	if codex {
 		if !strings.Contains(args, "--sandbox read-only") || !strings.Contains(args, "--disable shell_tool") || !strings.HasSuffix(args, " -") {
