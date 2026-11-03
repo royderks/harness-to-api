@@ -35,7 +35,7 @@ func normal(ctx context.Context, r harness.Request, emit func(string) error) (*h
 func setup(t *testing.T, run func(context.Context, harness.Request, func(string) error) (*harness.Usage, error), timeout time.Duration) (*Server, string, *auth.Store) {
 	t.Helper()
 	keys := auth.NewStore(t.TempDir())
-	token, _, err := keys.Create("test", []string{"codex/*"})
+	token, _, err := keys.Create("test", []string{"codex/*"}, auth.Policy{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,6 +43,7 @@ func setup(t *testing.T, run func(context.Context, harness.Request, func(string)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = s.Close() })
 	return s, token, keys
 }
 func perform(s *Server, token, path, body string) *httptest.ResponseRecorder {
@@ -142,13 +143,17 @@ func TestStreaming(t *testing.T) {
 func TestFailureAndTimeout(t *testing.T) {
 	for _, stream := range []bool{false, true} {
 		for _, timeout := range []bool{false, true} {
+			limit := time.Second
+			if timeout {
+				limit = 10 * time.Millisecond
+			}
 			s, key, _ := setup(t, func(ctx context.Context, _ harness.Request, _ func(string) error) (*harness.Usage, error) {
 				if timeout {
 					<-ctx.Done()
 					return nil, ctx.Err()
 				}
 				return nil, errors.New("secret provider credential")
-			}, 10*time.Millisecond)
+			}, limit)
 			body := chatBody
 			if stream {
 				body = strings.TrimSuffix(body, "}") + `,"stream":true}`

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,7 +11,7 @@ import (
 
 func TestKeyLifecycle(t *testing.T) {
 	s := NewStore(t.TempDir())
-	token, p, err := s.Create("sandbox", []string{"codex/*"})
+	token, p, err := s.Create("sandbox", []string{"codex/*"}, Policy{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +52,7 @@ func TestConcurrentKeys(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, _, err := s.Create("parallel", []string{"*"}); err != nil {
+			if _, _, err := s.Create("parallel", []string{"*"}, Policy{}); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -78,5 +79,39 @@ func TestIBMBobModelScopes(t *testing.T) {
 		if got := (Principal{Models: []string{tc.scope}}).Allows(model); got != tc.allowed {
 			t.Fatalf("scope %q: %v", tc.scope, got)
 		}
+	}
+}
+
+func TestLegacyRecordAndUnknownFields(t *testing.T) {
+	s := NewStore(t.TempDir())
+	token, p, err := s.Create("legacy", []string{"codex/*"}, Policy{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(s.Directory, p.ID+".json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var record map[string]json.RawMessage
+	if err := json.Unmarshal(data, &record); err != nil {
+		t.Fatal(err)
+	}
+	delete(record, "policy")
+	delete(record, "usage")
+	legacy, _ := json.Marshal(record)
+	if err := os.WriteFile(path, legacy, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Authenticate(token); err != nil {
+		t.Fatalf("legacy key rejected: %v", err)
+	}
+	record["polciy"] = json.RawMessage(`{"max_requests":1}`)
+	corrupt, _ := json.Marshal(record)
+	if err := os.WriteFile(path, corrupt, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Authenticate(token); err == nil {
+		t.Fatal("unknown policy field silently ignored")
 	}
 }

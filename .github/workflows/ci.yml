@@ -21,3 +21,6 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: H2A_BIN="$PWD/bin/h2a" ./demo/run.sh --fixture
+      - name: Exercise bounded-key CLI and HTTP lifecycle
+        if: runner.os != 'Windows'
+        run: python3 scripts/check-policies.py

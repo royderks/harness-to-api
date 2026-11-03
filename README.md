@@ -49,6 +49,16 @@ export OPENAI_API_KEY="$(./bin/h2a keys create --name local --models 'codex/*')"
 
 See the [CLI guide](docs/cli.md) for command help and stdout/stderr contracts. Your base URL is `http://127.0.0.1:8787/v1`. Keep the server running. Pass the generated key to your client using its secret/environment configuration.
 
+Give a sandbox bounded access with an expiring key:
+
+```sh
+export OPENAI_API_KEY="$(./bin/h2a keys create --name sandbox \
+  --models 'codex/*' --ttl 1h --request-timeout 90s \
+  --max-requests 20 --rate-limit 5/min --max-concurrent 1)"
+```
+
+Limits persist across restarts. Expiry and revocation cancel active managed runs. Use `keys inspect` to see policy and usage, `keys explain` for local checks, and `probe` for an explicit real request. See [key policies and model validation](docs/policies.md) and the [architecture](docs/architecture.md).
+
 ```sh
 curl http://127.0.0.1:8787/v1/chat/completions \
   -H "Authorization: Bearer $OPENAI_API_KEY" \

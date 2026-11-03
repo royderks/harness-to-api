@@ -8,9 +8,11 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"math"
 	"mime"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,11 +26,13 @@ type Config struct {
 	Timeout       time.Duration
 	MaxConcurrent int
 	Logger        *slog.Logger
+	AllowedModels []string
 }
 type Server struct {
-	config   Config
-	adapters map[string]harness.Adapter
-	slots    chan struct{}
+	config    Config
+	adapters  map[string]harness.Adapter
+	admission *auth.Admission
+	providers []string
 }
 
 func New(config Config) (*Server, error) {
@@ -57,9 +61,22 @@ func New(config Config) (*Server, error) {
 	if len(adapters) == 0 {
 		return nil, errors.New("at least one adapter is required")
 	}
-	return &Server{config: config, adapters: adapters, slots: make(chan struct{}, config.MaxConcurrent)}, nil
+	providers := make([]string, 0, len(adapters))
+	for id := range adapters {
+		providers = append(providers, id)
+	}
+	if err := ValidateModels(config.AllowedModels, providers); err != nil {
+		return nil, err
+	}
+	admission, err := config.Keys.OpenAdmission(config.Timeout, config.MaxConcurrent)
+	if err != nil {
+		return nil, err
+	}
+	config.AllowedModels = append([]string(nil), config.AllowedModels...)
+	return &Server{config: config, adapters: adapters, admission: admission, providers: providers}, nil
 }
-func randomID() string { var b [16]byte; _, _ = rand.Read(b[:]); return hex.EncodeToString(b[:]) }
+func (s *Server) Close() error { return s.admission.Close() }
+func randomID() string         { var b [16]byte; _, _ = rand.Read(b[:]); return hex.EncodeToString(b[:]) }
 func jsonResponse(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -101,7 +118,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		fail(w, 500, "key_store_error", "Unable to read API key store.")
+		fail(w, 503, "key_store_error", "Unable to read API key store.")
 		return
 	}
 	if r.URL.Path == "/v1/models" && r.Method == http.MethodGet {
@@ -138,26 +155,28 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "unsupported_request", err.Error())
 		return
 	}
-	if !principal.Can("completions:create") || !principal.Allows(req.Model) {
+	if !principal.Can("completions:create") {
 		fail(w, 403, "permission_denied", "Key cannot use this model.")
 		return
 	}
+	if err := CheckModel(req.Model, principal.Models, s.providers, s.config.AllowedModels); err != nil {
+		var modelErr *ModelError
+		if errors.As(err, &modelErr) && modelErr.Code == "permission_denied" {
+			fail(w, 403, modelErr.Code, "Key cannot use this model.")
+		} else {
+			fail(w, 404, "model_not_found", "Model is not available on this server.")
+		}
+		return
+	}
 	provider, model, _ := strings.Cut(req.Model, "/")
-	adapter, ok := s.adapters[provider]
-	if !ok {
-		fail(w, 404, "model_not_found", "Harness is not enabled on this server.")
+	adapter := s.adapters[provider]
+	lease, err := s.admission.Admit(r.Context(), header[1], req.Model)
+	if err != nil {
+		admissionError(w, err)
 		return
 	}
-	select {
-	case s.slots <- struct{}{}:
-		defer func() { <-s.slots }()
-	default:
-		w.Header().Set("Retry-After", "1")
-		fail(w, 429, "capacity_exceeded", "All harness slots are busy. Retry later.")
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), s.config.Timeout)
-	defer cancel()
+	defer lease.Close()
+	ctx := lease.Context()
 	input := harness.Request{Model: model, Prompt: prompt}
 	id := "cmpl-" + randomID()
 	if chat {
@@ -205,13 +224,21 @@ func (s *Server) models(w http.ResponseWriter, p auth.Principal) {
 		return
 	}
 	ids := map[string]bool{}
-	for id := range s.adapters {
-		if p.Allows(id + "/default") {
-			ids[id+"/default"] = true
+	if len(s.config.AllowedModels) > 0 {
+		for _, id := range s.config.AllowedModels {
+			if p.Allows(id) {
+				ids[id] = true
+			}
 		}
-		for _, scope := range p.Models {
-			if strings.HasPrefix(scope, id+"/") && !strings.HasSuffix(scope, "*") {
-				ids[scope] = true
+	} else {
+		for id := range s.adapters {
+			if p.Allows(id + "/default") {
+				ids[id+"/default"] = true
+			}
+			for _, scope := range p.Models {
+				if strings.HasPrefix(scope, id+"/") && !strings.HasSuffix(scope, "*") {
+					ids[scope] = true
+				}
 			}
 		}
 	}
@@ -227,7 +254,37 @@ func (s *Server) models(w http.ResponseWriter, p auth.Principal) {
 	}
 	jsonResponse(w, 200, map[string]any{"object": "list", "data": data})
 }
+func admissionError(w http.ResponseWriter, err error) {
+	var limit *auth.LimitError
+	if errors.As(err, &limit) {
+		seconds := int(math.Ceil(limit.RetryAfter.Seconds()))
+		if seconds < 1 {
+			seconds = 1
+		}
+		if limit.Code != "request_quota_exceeded" {
+			w.Header().Set("Retry-After", strconv.Itoa(seconds))
+		}
+		fail(w, 429, limit.Code, "Request limit exceeded.")
+		return
+	}
+	if errors.Is(err, auth.ErrInvalidKey) || errors.Is(err, auth.ErrRevokedKey) {
+		w.Header().Set("WWW-Authenticate", "Bearer")
+		fail(w, 401, "invalid_api_key", "A valid Bearer API key is required.")
+		return
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		fail(w, 408, "request_canceled", "Request was canceled.")
+		return
+	}
+	fail(w, 503, "key_store_error", "Unable to read API key store.")
+}
 func harnessError(ctx context.Context) (int, string, string) {
+	if errors.Is(context.Cause(ctx), auth.ErrExpiredKey) || errors.Is(context.Cause(ctx), auth.ErrRevokedKey) {
+		return 401, "invalid_api_key", "A valid Bearer API key is required."
+	}
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return 408, "request_canceled", "Request was canceled."
+	}
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return 504, "harness_timeout", "Harness exceeded the request timeout."
 	}
@@ -313,6 +370,9 @@ func (s *Server) stream(ctx context.Context, w http.ResponseWriter, adapter harn
 				return
 			}
 		case res := <-results:
+			if ctx.Err() != nil {
+				res.err = ctx.Err()
+			}
 			if res.err != nil {
 				s.logFailure(requestID, ctx)
 				status, code, message := harnessError(ctx)
@@ -331,17 +391,17 @@ func (s *Server) stream(ctx context.Context, w http.ResponseWriter, adapter harn
 					return
 				}
 			}
-			_ = write("data: [DONE]\n\n")
+			if ctx.Err() == nil {
+				_ = write("data: [DONE]\n\n")
+			}
 			return
 		case <-heartbeat.C:
 			if err := write(": keep-alive\n\n"); err != nil {
 				return
 			}
 		case <-ctx.Done():
-			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				status, code, message := harnessError(ctx)
-				_ = send(errorBody(status, code, message))
-			}
+			status, code, message := harnessError(ctx)
+			_ = send(errorBody(status, code, message))
 			return
 		}
 	}

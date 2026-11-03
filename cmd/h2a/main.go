@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -30,7 +29,8 @@ const help = `h2a — Your coding harness, as an authenticated OpenAI-compatible
 Usage:
   h2a doctor
   h2a keys create [--name local] [--models 'codex/*'] [--state-dir PATH]
-  h2a keys list [--state-dir PATH]
+  h2a keys list|inspect|explain [flags]
+  h2a probe --model provider/model [--base-url URL]
   h2a keys revoke [--state-dir PATH] KEY_ID
   h2a serve [--provider codex[,gemini,...]|all] [--port 8787]
   h2a share [--via tailscale|funnel|cloudflare] [--port 8787]
@@ -88,7 +88,7 @@ func run(args []string) error {
 	case "help":
 		if len(args) > 1 {
 			switch args[1] {
-			case "serve", "keys", "doctor", "share":
+			case "serve", "keys", "doctor", "share", "probe":
 				return run(append(append([]string{}, args[1:]...), "--help"))
 			default:
 				return fmt.Errorf("unknown help topic %q; run h2a --help", args[1])
@@ -110,6 +110,8 @@ func run(args []string) error {
 		return nil
 	case "keys":
 		return keyCommand(args[1:])
+	case "probe":
+		return probeCommand(args[1:])
 	case "serve":
 		return serveCommand(args[1:])
 	case "doctor":
@@ -118,65 +120,6 @@ func run(args []string) error {
 		return share(args[1:])
 	default:
 		return fmt.Errorf("unknown command %q; run h2a --help", args[0])
-	}
-}
-func keyCommand(args []string) error {
-	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Fprintln(os.Stderr, "Usage: h2a keys <create|list|revoke> [flags]\n\nCreate prints a secret once; list prints JSON metadata; revoke takes a key ID.\nUse h2a keys <command> --help for flags.")
-		return nil
-	}
-	if args[0] != "create" && args[0] != "list" && args[0] != "revoke" {
-		return fmt.Errorf("unknown keys command %q; use h2a keys --help", args[0])
-	}
-	f := flags("keys " + args[0])
-	if args[0] == "revoke" {
-		f.Usage = func() {
-			fmt.Fprintln(f.Output(), "Usage: h2a keys revoke [flags] KEY_ID\n\nFlags:")
-			f.PrintDefaults()
-		}
-	}
-	state := f.String("state-dir", stateDefault(), "directory for hashed API keys")
-	name, models := "default", "*"
-	if args[0] == "create" {
-		f.StringVar(&name, "name", "default", "key label")
-		f.StringVar(&models, "models", "*", "comma-separated model scopes")
-	}
-	if err := f.Parse(args[1:]); err != nil {
-		return err
-	}
-	store := auth.NewStore(*state)
-	switch args[0] {
-	case "create":
-		if f.NArg() != 0 {
-			return errors.New("keys create takes flags only")
-		}
-		token, p, err := store.Create(name, strings.Split(models, ","))
-		if err != nil {
-			return err
-		}
-		fmt.Println(token)
-		fmt.Fprintf(os.Stderr, "Created key %s. Save stdout securely; this key will not be shown again.\n", p.ID)
-		return nil
-	case "list":
-		if f.NArg() != 0 {
-			return errors.New("keys list takes flags only")
-		}
-		principals, err := store.List()
-		if err != nil {
-			return err
-		}
-		return json.NewEncoder(os.Stdout).Encode(principals)
-	case "revoke":
-		if f.NArg() != 1 {
-			return errors.New("usage: h2a keys revoke [--state-dir PATH] KEY_ID")
-		}
-		if err := store.Revoke(f.Arg(0)); err != nil {
-			return err
-		}
-		fmt.Fprintln(os.Stderr, "Key revoked; new requests will be rejected.")
-		return nil
-	default:
-		return errors.New("use keys create, list, or revoke")
 	}
 }
 func selectProviders(value string) ([]string, error) {
@@ -207,6 +150,7 @@ func serveCommand(args []string) error {
 	f := flags("serve")
 	state := f.String("state-dir", stateDefault(), "directory for hashed API keys")
 	provider := f.String("provider", "codex", "comma-separated codex, antigravity, ibm-bob, gemini, claude, opencode; or all")
+	allowed := f.String("allowed-models", "", "comma-separated strict model catalog")
 	host := f.String("host", "127.0.0.1", "bind address")
 	port := f.Int("port", 8787, "HTTP port")
 	timeout := f.Duration("timeout", 2*time.Minute, "maximum request duration, e.g. 120s")
@@ -232,6 +176,10 @@ func serveCommand(args []string) error {
 	}
 	selected, err := selectProviders(*provider)
 	if err != nil {
+		return err
+	}
+	catalog := splitList(*allowed)
+	if err := api.ValidateModels(catalog, selected); err != nil {
 		return err
 	}
 	configured := map[string]struct {
@@ -272,10 +220,11 @@ func serveCommand(args []string) error {
 		return errors.New("create a key first: h2a keys create --name local (use the same --state-dir)")
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
-	app, err := api.New(api.Config{Keys: store, Adapters: adapters, Timeout: *timeout, MaxConcurrent: *concurrent, Logger: logger})
+	app, err := api.New(api.Config{Keys: store, Adapters: adapters, Timeout: *timeout, MaxConcurrent: *concurrent, Logger: logger, AllowedModels: catalog})
 	if err != nil {
 		return err
 	}
+	defer app.Close()
 	lifetime, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	server := &http.Server{Addr: net.JoinHostPort(*host, fmt.Sprint(*port)), Handler: app,
