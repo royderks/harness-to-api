@@ -4,4 +4,6 @@ The native storage library implements hashed keys, durable admission and protect
 
 Harness adapters normalize six CLI protocols and supervise subprocess cleanup.
 
+The HTTP server supports authenticated text completions, model listing and SSE.
+
 Build and test with Rust 1.89 or newer. Provider access is configured separately; offline fixtures do not establish live account access.
