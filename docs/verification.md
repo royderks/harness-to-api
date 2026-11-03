@@ -37,3 +37,20 @@ Added adapters and individual or comma-separated provider selection on 2026-11-0
 - OpenCode: official v2.2.5 CLI installed temporarily, confirmed standalone JSON flags and emitted the expected structured error for an unavailable model. Protocol fixtures passed; a successful real-provider request remains unverified.
 
 No global installations or account logins were changed. These adapters are not yet bundled in the Docker image. Existing Codex and Antigravity live results remain as recorded above.
+
+## Bounded keys and model validation
+
+Implemented at `126f74742a0707fc0055d9418cca97cc6ea31c98` on 2026-11-03. The independent final review traced this commit against `f63f31941eeb5df39e537a017eaeaba49697b134` and found no proved defects. It ran targeted auth, API, and CLI tests; that review is not a claim of native Windows verification.
+
+Verified on macOS arm64:
+
+- Full `make check build`: race tests, vet, formatting, and native build.
+- Auth tests for concurrent final-quota admission, rolling-window expiry, clock rollback, durable counters after restart, legacy records, corrupt/unknown records, expiration, cancellation, and separate-process lock/revocation behavior.
+- API tests for identical admission across streaming/nonstreaming requests, strict model filtering, expired model listing, zero debit on invalid requests, quota/rate/concurrency denials, and refusing a second server on the same state directory.
+- `GO=/tmp/h2a-go-toolchain/go/bin/go python3 scripts/check-policies.py`: the built CLI and HTTP server drove an actual offline fixture subprocess. It checked durable quotas, read-only explanation, rate limits, timed-out streams, expired streams, separate-process revocation, and a quota-counted probe. It checked generated keys were absent from diagnostics. CI now runs this check on Linux/macOS.
+- One live `codex/default` probe at `2026-11-03T23:24:49Z` returned a valid HTTP 200 completion with `available: true`. Its key had a two-minute lifetime, 60-second request timeout, one-request quota, and concurrency one. Inspection then showed one accepted request and zero remaining allowance. The temporary server and state were cleaned up.
+- Six preview.4 release targets built: macOS, Linux, and Windows, each on amd64 and arm64. Their archive SHA-256 checksums verified.
+
+Integration review found and fixed a probe that sent unsupported `max_tokens` and accepted arbitrary HTTP 200 bodies. The probe now sends the supported request shape, validates a completed chat response, and exits nonzero on failure without reflecting response content or credentials.
+
+Windows locking/storage uses native APIs and its tests cross-compile; it has not been executed on Windows here. Hosted CI remains unrun because this repository has not been published. No cloud resources or tunnels were started for this change. See [policy semantics](policies.md) and [architecture and platform limits](architecture.md).
