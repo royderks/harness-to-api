@@ -20,9 +20,10 @@ ROOT = Path(__file__).resolve().parent.parent
 def main():
     parser = argparse.ArgumentParser(description="Run an isolated h2a authentication and streaming demo")
     parser.add_argument("--fixture", action="store_true", help="use an offline fake Codex CLI; no provider call")
-    parser.add_argument("--provider", choices=["codex", "antigravity", "ibm-bob"], default="codex")
+    parser.add_argument("--provider", choices=["codex", "antigravity", "ibm-bob", "gemini", "claude", "opencode"], default="codex")
     parser.add_argument("--model", help="full provider/model ID (default: ibm-bob/premium for Bob, provider/default otherwise)")
     parser.add_argument("--pi-bob-extension", help="absolute path to the installed pi-bob package (required for IBM Bob)")
+    parser.add_argument("--harness-bin", help="path to the selected harness executable")
     args = parser.parse_args()
     model = args.model or ("ibm-bob/premium" if args.provider == "ibm-bob" else args.provider + "/default")
     if not model.startswith(args.provider + "/"):
@@ -54,6 +55,9 @@ def main():
             port = sock.getsockname()[1]
         base = f"http://127.0.0.1:{port}"
         command = [binary, "serve", "--state-dir", str(state), "--provider", args.provider, "--port", str(port)]
+        if args.harness_bin:
+            binary_flag = {"codex": "--codex-bin", "antigravity": "--antigravity-bin", "ibm-bob": "--pi-bin", "gemini": "--gemini-bin", "claude": "--claude-bin", "opencode": "--opencode-bin"}[args.provider]
+            command += [binary_flag, args.harness_bin]
         if args.provider == "ibm-bob":
             command += ["--pi-bob-extension", args.pi_bob_extension]
         if args.fixture:

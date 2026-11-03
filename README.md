@@ -2,7 +2,7 @@
 
 **Your coding harness. One OpenAI-compatible endpoint.**
 
-Run Codex, Antigravity, or IBM Bob through Pi behind an API key. Point an OpenAI client at it—from your laptop, a container, or a remote sandbox.
+Run Codex, Antigravity, Gemini CLI, Claude Code, OpenCode, or IBM Bob through Pi behind an API key. Point an OpenAI client at it—from your laptop, a container, or a remote sandbox.
 
 A single Go binary, with no third-party Go dependencies. End users do **not** need Go, Node, or Python to run the gateway. Install and authenticate each harness CLI separately. IBM Bob uses the community `pi-bob` extension for Pi.
 
@@ -67,13 +67,24 @@ Install the [official Antigravity CLI](https://antigravity.google/docs/cli/tutor
 ./bin/h2a serve --provider antigravity
 ```
 
-Use `antigravity/default` or `antigravity/<model-slug>`. Run `agy models` for your available models. `--provider all` enables all three adapters; Codex, Antigravity, and Pi with the Bob extension must be installed. Keys can allow both using `--models 'codex/*,antigravity/*'`.
+Use `antigravity/default` or `antigravity/<model-slug>`. Run `agy models` for your available models. `--provider codex,antigravity` enables both in one server. `--provider all` enables all six adapters and requires all CLIs plus the Bob extension. Keys can allow both using `--models 'codex/*,antigravity/*'`.
 
 The gateway invokes supported harness CLIs; the IBM integration uses the explicitly installed community Pi extension. It does not extract OAuth tokens or call private provider endpoints. Harness login, subscription access, model eligibility, and provider limits remain controlled by each provider. An h2a key protects this gateway; it is not an OpenAI, Google, or IBM provider key.
 
 ## IBM Bob through Pi
 
 IBM Bob is available as `--provider ibm-bob`, with models such as `ibm-bob/premium` or `ibm-bob/openai/gpt-oss-20b`. It uses [pi-bob](https://pi.dev/packages/pi-bob), a community Pi provider extension, not IBM's official Bob CLI. See [installation, login, and serving instructions](docs/ibm-bob.md). The adapter is tested against the Pi protocol; live IBM account inference has not been verified here.
+
+## Gemini CLI, Claude Code, and OpenCode
+
+See [Gemini CLI setup](docs/gemini.md), [Claude Code setup](docs/claude.md), and [OpenCode setup](docs/opencode.md) for installation, login, supported versions, execution restrictions, and verification status.
+
+```sh
+h2a keys create --name mixed-client --models 'codex/*,gemini/*'
+h2a serve --provider codex,gemini
+```
+
+Use `gemini/default`, `claude/default`, or an explicit model under that harness prefix. OpenCode model IDs include its upstream provider: `opencode/<provider>/<model-id>`. `/v1/models` lists the enabled aliases and your key's exact scopes; it does not discover account entitlements.
 
 ## Use an OpenAI client
 
@@ -135,7 +146,7 @@ Use the native binary for local setup. For an always-on endpoint, use the includ
 ## Operational controls
 
 ```sh
-h2a serve --provider all --pi-bob-extension "$(npm root -g)/pi-bob" --port 8787 --timeout 120s --max-concurrent 4
+h2a serve --provider codex,gemini --port 8787 --timeout 120s --max-concurrent 4
 h2a doctor
 ```
 
@@ -143,7 +154,7 @@ Defaults: loopback only, a 1 MiB request limit, 8 MiB response text limit, two-m
 
 Keys and client environment secrets are excluded from the child environment. Official CLI credential locations remain accessible for login. Gateway logs include request IDs and error codes, not prompts, keys, raw subprocess diagnostics, or model output. The official harness can retain its own logs; Codex is invoked with `--ephemeral`.
 
-`--codex-bin`, `--antigravity-bin`, and `--pi-bin` select executable paths locally. `--pi-bob-extension` selects the installed Bob package. The HTTP API cannot override executables, working directories, or command-line flags.
+`--codex-bin`, `--antigravity-bin`, `--pi-bin`, `--gemini-bin`, `--claude-bin`, and `--opencode-bin` select executable paths locally. `--pi-bob-extension` selects the installed Bob package. The HTTP API cannot override executables, working directories, or command-line flags.
 
 ## Develop and release
 

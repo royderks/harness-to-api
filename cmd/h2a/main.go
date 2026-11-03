@@ -32,7 +32,7 @@ Usage:
   h2a keys create [--name local] [--models 'codex/*'] [--state-dir PATH]
   h2a keys list [--state-dir PATH]
   h2a keys revoke [--state-dir PATH] KEY_ID
-  h2a serve [--provider codex|antigravity|ibm-bob|all] [--port 8787]
+  h2a serve [--provider codex[,gemini,...]|all] [--port 8787]
   h2a share [--via tailscale|funnel|cloudflare] [--port 8787]
   h2a version
 
@@ -179,10 +179,34 @@ func keyCommand(args []string) error {
 		return errors.New("use keys create, list, or revoke")
 	}
 }
+func selectProviders(value string) ([]string, error) {
+	all := []string{"codex", "antigravity", "ibm-bob", "gemini", "claude", "opencode"}
+	if value == "all" {
+		return all, nil
+	}
+	selected := strings.Split(value, ",")
+	seen := map[string]bool{}
+	for i, name := range selected {
+		name = strings.TrimSpace(name)
+		known := false
+		for _, candidate := range all {
+			if name == candidate {
+				known = true
+				break
+			}
+		}
+		if !known || seen[name] {
+			return nil, fmt.Errorf("invalid or repeated provider %q; choose from %s, or all", name, strings.Join(all, ", "))
+		}
+		selected[i], seen[name] = name, true
+	}
+	return selected, nil
+}
+
 func serveCommand(args []string) error {
 	f := flags("serve")
 	state := f.String("state-dir", stateDefault(), "directory for hashed API keys")
-	provider := f.String("provider", "codex", "codex, antigravity, ibm-bob, or all")
+	provider := f.String("provider", "codex", "comma-separated codex, antigravity, ibm-bob, gemini, claude, opencode; or all")
 	host := f.String("host", "127.0.0.1", "bind address")
 	port := f.Int("port", 8787, "HTTP port")
 	timeout := f.Duration("timeout", 2*time.Minute, "maximum request duration, e.g. 120s")
@@ -190,6 +214,9 @@ func serveCommand(args []string) error {
 	codexBin := f.String("codex-bin", "codex", "official Codex executable")
 	agyBin := f.String("antigravity-bin", "agy", "official Antigravity executable")
 	piBin := f.String("pi-bin", "pi", "Pi executable")
+	geminiBin := f.String("gemini-bin", "gemini", "Gemini CLI executable")
+	claudeBin := f.String("claude-bin", "claude", "Claude Code executable")
+	opencodeBin := f.String("opencode-bin", "opencode", "OpenCode executable")
 	bobExtension := f.String("pi-bob-extension", "", "absolute path to installed pi-bob package")
 	if err := parse(f, args); err != nil {
 		return err
@@ -203,38 +230,38 @@ func serveCommand(args []string) error {
 	if *concurrent < 1 || *concurrent > 128 {
 		return errors.New("max-concurrent must be 1–128")
 	}
-	adapters := []harness.Adapter{}
-	switch *provider {
-	case "codex":
-		adapters = append(adapters, harness.Codex{Binary: *codexBin})
-	case "antigravity":
-		adapters = append(adapters, harness.Antigravity{Binary: *agyBin})
-	case "ibm-bob":
-		adapters = append(adapters, harness.IBMBob{Binary: *piBin, Extension: *bobExtension})
-	case "all":
-		adapters = append(adapters, harness.Codex{Binary: *codexBin}, harness.Antigravity{Binary: *agyBin}, harness.IBMBob{Binary: *piBin, Extension: *bobExtension})
-	default:
-		return errors.New("provider must be codex, antigravity, ibm-bob, or all")
+	selected, err := selectProviders(*provider)
+	if err != nil {
+		return err
 	}
-	if *provider == "ibm-bob" || *provider == "all" {
-		if !filepath.IsAbs(*bobExtension) {
-			return errors.New("--pi-bob-extension must be an absolute path to the installed pi-bob package")
-		}
-		if info, err := os.Stat(filepath.Join(*bobExtension, "extensions", "bob.ts")); err != nil || !info.Mode().IsRegular() {
-			return errors.New("--pi-bob-extension must contain extensions/bob.ts; install pi-bob first")
+	configured := map[string]struct {
+		adapter harness.Adapter
+		binary  string
+	}{
+		"codex":       {harness.Codex{Binary: *codexBin}, *codexBin},
+		"antigravity": {harness.Antigravity{Binary: *agyBin}, *agyBin},
+		"ibm-bob":     {harness.IBMBob{Binary: *piBin, Extension: *bobExtension}, *piBin},
+		"gemini":      {harness.Gemini{Binary: *geminiBin}, *geminiBin},
+		"claude":      {harness.Claude{Binary: *claudeBin}, *claudeBin},
+		"opencode":    {harness.OpenCode{Binary: *opencodeBin}, *opencodeBin},
+	}
+	for _, id := range selected {
+		if id == "ibm-bob" {
+			if !filepath.IsAbs(*bobExtension) {
+				return errors.New("--pi-bob-extension must be an absolute path to the installed pi-bob package")
+			}
+			if info, err := os.Stat(filepath.Join(*bobExtension, "extensions", "bob.ts")); err != nil || !info.Mode().IsRegular() {
+				return errors.New("--pi-bob-extension must contain extensions/bob.ts; install pi-bob first")
+			}
 		}
 	}
-	for _, adapter := range adapters {
-		binary := *codexBin
-		if adapter.ID() == "antigravity" {
-			binary = *agyBin
+	adapters := make([]harness.Adapter, 0, len(selected))
+	for _, id := range selected {
+		entry := configured[id]
+		if _, err := exec.LookPath(entry.binary); err != nil {
+			return fmt.Errorf("%s CLI not found (%s); install and sign in first", id, entry.binary)
 		}
-		if adapter.ID() == "ibm-bob" {
-			binary = *piBin
-		}
-		if _, err := exec.LookPath(binary); err != nil {
-			return fmt.Errorf("%s CLI not found (%s); install and sign in first", adapter.ID(), binary)
-		}
+		adapters = append(adapters, entry.adapter)
 	}
 	store := auth.NewStore(*state)
 	list, err := store.List()
@@ -285,10 +312,13 @@ func serveCommand(args []string) error {
 func doctor(args []string) error {
 	f := flags("doctor")
 	piBin := f.String("pi-bin", "pi", "Pi executable")
+	geminiBin := f.String("gemini-bin", "gemini", "Gemini CLI executable")
+	claudeBin := f.String("claude-bin", "claude", "Claude Code executable")
+	opencodeBin := f.String("opencode-bin", "opencode", "OpenCode executable")
 	if err := parse(f, args); err != nil {
 		return err
 	}
-	for _, binary := range []string{"codex", "agy", *piBin, "tailscale", "cloudflared"} {
+	for _, binary := range []string{"codex", "agy", *piBin, *geminiBin, *claudeBin, *opencodeBin, "tailscale", "cloudflared"} {
 		path, err := exec.LookPath(binary)
 		if err != nil {
 			fmt.Printf("%s: not installed\n", binary)
@@ -305,7 +335,7 @@ func doctor(args []string) error {
 			fmt.Printf("%s: %s\n", binary, strings.TrimSpace(string(output)))
 		}
 	}
-	fmt.Println("Login is not checked. Use codex login or an interactive agy session. For community pi-bob, use Pi /login ibm-bob. Tunnels are optional.")
+	fmt.Println("Login is not checked. Sign in with each CLI before serving it. For community pi-bob, use Pi /login ibm-bob. Tunnels are optional.")
 	return nil
 }
 func share(args []string) error {

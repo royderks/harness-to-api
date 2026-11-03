@@ -1,6 +1,6 @@
 # Docker
 
-The image runs the gateway as UID 10001 and includes OpenAI Codex CLI 0.166.0 and Pi CLI 1.5.0. It also includes `pi-bob` 0.2.6, a **third-party** Pi extension for IBM Bob, not IBM's Bob CLI. Package versions are pinned in the Dockerfile; base image tags and transitive npm dependencies are not digest/lockfile pinned. The image does not contain the Antigravity `agy` CLI: `antigravity` and `all` are unsupported. The gateway includes the `ibm-bob` adapter.
+The image runs the gateway as UID 10001 and includes OpenAI Codex CLI 0.166.0 and Pi CLI 1.5.0. It also includes `pi-bob` 0.2.6, a **third-party** Pi extension for IBM Bob, not IBM's Bob CLI. Package versions are pinned in the Dockerfile; base image tags and transitive npm dependencies are not digest/lockfile pinned. The image does not contain the Antigravity `agy` CLI: `antigravity`, `gemini`, `claude`, `opencode`, and `all` are unsupported by this image. Those adapters are available with a native h2a installation and the corresponding CLI. The gateway includes the `ibm-bob` adapter.
 
 Use a full source checkout; native release archives alone are not a Docker build context. From the repository root, build and create a gateway key (the key is printed once; save it securely):
 

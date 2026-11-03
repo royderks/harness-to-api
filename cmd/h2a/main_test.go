@@ -124,3 +124,19 @@ func TestBobRequiresExplicitPackage(t *testing.T) {
 		t.Fatalf("missing package: %s %v", diagnostic, err)
 	}
 }
+
+func TestProviderSelection(t *testing.T) {
+	for _, value := range []string{"", "codex,", "codex,codex", "all,codex", "unknown"} {
+		if _, err := selectProviders(value); err == nil {
+			t.Errorf("accepted %q", value)
+		}
+	}
+	selected, err := selectProviders("codex, gemini,claude")
+	if err != nil || strings.Join(selected, ",") != "codex,gemini,claude" {
+		t.Fatalf("%v %v", selected, err)
+	}
+	selected, err = selectProviders("all")
+	if err != nil || len(selected) != 6 {
+		t.Fatalf("all: %v %v", selected, err)
+	}
+}

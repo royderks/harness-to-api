@@ -27,3 +27,13 @@ The local Go toolchain was downloaded into `/tmp/h2a-go-toolchain` from go.dev a
 ## IBM Bob and deployment follow-up
 
 On 2026-11-03, added the Pi-backed IBM Bob adapter. The installed Pi 1.5.0 and pi-bob 0.2.6 passed a real runtime check against a local fake IBM endpoint, with isolated configuration and test credentials. This is protocol evidence, not live IBM inference. See [IBM details](ibm-bob.md). Compose configuration validates; a Docker storage database I/O error blocked the image build. See [Docker status](docker.md). No Cloudflare or Vercel resources were provisioned.
+
+## Gemini, Claude Code and OpenCode
+
+Added adapters and individual or comma-separated provider selection on 2026-11-03. Combined race tests, vet, and fixture HTTP checks passed. The HTTP check ran all three new adapters in one server and covered model listing, normal completions, SSE, gateway-key exclusion, scope rejection and revocation. It used subprocess fixtures, not provider inference.
+
+- Gemini: installed CLI 0.26.0 protocol/settings checked. The final adapter was exercised through HTTP, but live authentication failed because this account requires `GOOGLE_CLOUD_PROJECT` or `GOOGLE_CLOUD_PROJECT_ID`. Neither is configured here. Google authentication/project variables are now forwarded only to Gemini. No successful live response is claimed.
+- Claude Code: official CLI 2.1.317 installed temporarily, accepted the adapter flags and reported empty tools/MCP lists. Safe mode preserves the normal login path; the CLI reported no existing login. Protocol fixtures passed; subscription inference remains unverified.
+- OpenCode: official v2.2.5 CLI installed temporarily, confirmed standalone JSON flags and emitted the expected structured error for an unavailable model. Protocol fixtures passed; a successful real-provider request remains unverified.
+
+No global installations or account logins were changed. These adapters are not yet bundled in the Docker image. Existing Codex and Antigravity live results remain as recorded above.
