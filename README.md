@@ -127,9 +127,9 @@ h2a keys list
 h2a keys revoke KEY_ID
 ```
 
-Keys contain 256 bits of random secret material. Hashes and metadata live in `~/.harness-to-api/keys`, with restrictive file permissions on Unix. Use `--state-dir PATH` on key and server commands, or `HARNESS_API_STATE_DIR`, to change the location. Revocation affects the next request without restarting; it does not cancel requests already running.
+Keys contain 256 bits of random secret material. Hashes and metadata live in `~/.harness-to-api/keys`, with restrictive file permissions on Unix. Use `--state-dir PATH` on key and server commands, or `HARNESS_API_STATE_DIR`, to change the location. Revocation affects new requests without restarting and cancels active managed runs when the admission watcher observes the change.
 
-Exact-model and provider scopes are enforced now. The stored permission names are `models:read` and `completions:create`. Future work: expiration, per-key budgets, rate limits, tool permissions, and stronger per-client execution isolation. Do not put keys in URLs.
+Exact-model and provider scopes, expiry, request quotas, rate limits, and concurrency limits are enforced now. The stored permission names are `models:read` and `completions:create`. Dollar budgets, tool permissions, and stronger per-client execution isolation remain future work. See [policy semantics](docs/policies.md). Do not put keys in URLs.
 
 ## Remote sandboxes
 
@@ -182,3 +182,7 @@ Add harnesses by implementing [`harness.Adapter`](internal/harness/harness.go), 
 `scripts/release.sh v0.1.0` creates six binaries (macOS/Linux/Windows × arm64/amd64), archives, and SHA-256 checksums. The included GitHub workflow runs on version tags after the repository is published. See [distribution decisions](docs/distribution.md). No release or registry publication has been performed.
 
 MIT licensed. Independent project; not affiliated with OpenAI or Google.
+
+## Project direction and contribution workflow
+
+[Product intent](GENESIS.md) records the intended product. [Decisions](DECISIONS.md) explains the implementation choices and open questions. The [GitHub factory guide](docs/factory.md) covers issue intake, bounded worker handoffs, verification, and human review.

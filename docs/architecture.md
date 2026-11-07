@@ -75,7 +75,7 @@ Normal cancellation and graceful shutdown stop managed runs. A forcibly killed g
 
 Stopping a local CLI does not prove the upstream service stopped computation or refunded subscription usage. Missing provider token usage remains unknown. This release enforces accepted request counts and local runtime controls, not exact dollar budgets or upstream token spending.
 
-Linux and macOS use advisory file locks, file synchronization, atomic rename, and directory synchronization. Windows uses native `LockFileEx` and a flushed temporary file followed by a write-through replacement. Revocation first moves the Windows record out of the active namespace; a crash can leave an ignored `.revoked-*` tombstone. Windows builds and tests cross-compile, but native Windows execution must be verified in CI. Its write-through move is not a claim of POSIX directory-sync semantics.
+Linux and macOS use advisory file locks, file synchronization, atomic rename, and directory synchronization. Windows uses native `LockFileEx` and a flushed temporary file followed by a write-through replacement. Revocation first moves the Windows record out of the active namespace; a crash can leave an ignored `.revoked-*` tombstone. Windows Go tests and the native build passed in the first hosted CI run on 2026-11-07; see [verification](verification.md#first-hosted-ci-run). This does not verify every Windows architecture or descendant cleanup. Its write-through move is not a claim of POSIX directory-sync semantics.
 
 ## Extension rule
 

@@ -1,0 +1,16 @@
+name: Factory validation
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/factory.py validate
+      - run: python3 -m unittest discover -s scripts/tests -v

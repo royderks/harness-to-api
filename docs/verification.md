@@ -54,3 +54,13 @@ Verified on macOS arm64:
 Integration review found and fixed a probe that sent unsupported `max_tokens` and accepted arbitrary HTTP 200 bodies. The probe now sends the supported request shape, validates a completed chat response, and exits nonzero on failure without reflecting response content or credentials.
 
 Windows locking/storage uses native APIs and its tests cross-compile; it has not been executed on Windows here. Hosted CI remains unrun because this repository has not been published. No cloud resources or tunnels were started for this change. See [policy semantics](policies.md) and [architecture and platform limits](architecture.md).
+
+## First hosted CI run
+
+On 2026-11-07, the private repository's [first hosted run](https://github.com/royderks/harness-to-api/actions/runs/42425919094) passed at baseline `072fa7497995113afffa07fcd7a38398cd92c0e9`.
+
+- Ubuntu, macOS, and Windows jobs ran `go vet ./...`, `go test -race ./...`, and the native build successfully.
+- Ubuntu and macOS also passed the offline demo and bounded-key CLI/HTTP lifecycle check.
+- The workflow intentionally skipped those two Python/shell integration checks on Windows. Passing Go tests do not establish Windows descendant process-tree cleanup or execution of every cross-compiled archive.
+
+This supersedes the earlier statements that hosted CI and native Windows tests had not run. It adds no live-provider, public distribution, signing, or cloud deployment evidence.
