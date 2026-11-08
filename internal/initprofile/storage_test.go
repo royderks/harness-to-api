@@ -134,3 +134,34 @@ func TestStorageRetainsDirectoryIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Exercise the actual auth artifacts that init encounters on a later run.
+func TestStorageReopensAuthStoreFiles(t *testing.T) {
+	state := filepath.Join(t.TempDir(), "state")
+	s, err := Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	keys := auth.NewStore(state)
+	admission, err := keys.OpenAdmission(0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := keys.Create("manual", []string{"codex/default"}, auth.Policy{}); err != nil {
+		admission.Close()
+		t.Fatal(err)
+	}
+	if err := admission.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = Open(state)
+	if err != nil {
+		t.Fatalf("reopen after auth store writes: %v", err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+}

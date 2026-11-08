@@ -109,3 +109,30 @@ func TestWindowsRemoveRetriesInterruptedMove(t *testing.T) {
 		t.Fatalf("tombstone remains: %v", err)
 	}
 }
+
+func TestWindowsRejectsDanglingDirectoryLinkWithoutCreatingTarget(t *testing.T) {
+	parent := t.TempDir()
+	target := filepath.Join(parent, "missing-target")
+	link := filepath.Join(parent, "linked")
+	linkName, err := syscall.UTF16PtrFromString(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetName, err := syscall.UTF16PtrFromString(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	createLink := winKernel.NewProc("CreateSymbolicLinkW")
+	// DIRECTORY | ALLOW_UNPRIVILEGED_CREATE; older systems may reject it.
+	r, _, e := createLink.Call(uintptr(unsafe.Pointer(linkName)), uintptr(unsafe.Pointer(targetName)), 3)
+	if r == 0 {
+		t.Skipf("directory symlink creation unavailable: %v", e)
+	}
+	if s, err := Open(link); err == nil {
+		s.Close()
+		t.Fatal("accepted dangling reparse point")
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatalf("link target was created or could not be inspected: %v", err)
+	}
+}

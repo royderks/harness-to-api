@@ -184,16 +184,19 @@ func openDirectoryHandle(path string) (syscall.Handle, error) {
 	return h, nil
 }
 func (p *platformStore) ensureDirectory(path string, private bool) error {
-	name, err := syscall.UTF16PtrFromString(path)
-	if err != nil {
-		return err
-	}
-	sa := securityAttributes(p.descriptor)
-	r, _, callErr := createDirectory.Call(uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(&sa)))
-	if r == 0 && !errors.Is(callErr, syscall.ERROR_ALREADY_EXISTS) {
-		return callErr
-	}
 	h, err := openDirectoryHandle(path)
+	if errors.Is(err, syscall.ERROR_FILE_NOT_FOUND) {
+		name, nameErr := syscall.UTF16PtrFromString(path)
+		if nameErr != nil {
+			return nameErr
+		}
+		sa := securityAttributes(p.descriptor)
+		r, _, callErr := createDirectory.Call(uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(&sa)))
+		if r == 0 && !errors.Is(callErr, syscall.ERROR_ALREADY_EXISTS) {
+			return callErr
+		}
+		h, err = openDirectoryHandle(path)
+	}
 	if err != nil {
 		return err
 	}
