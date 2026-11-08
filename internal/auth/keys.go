@@ -196,7 +196,10 @@ func (s *Store) write(r record) error {
 	}
 	return replaceRecord(f.Name(), filepath.Join(s.Directory, r.ID+".json"))
 }
-func (s *Store) Create(name string, models []string, policy Policy) (string, Principal, error) {
+
+// Prepare creates an identity without persisting it. The caller must retain the
+// token securely until InsertPrepared succeeds or the attempt is discarded.
+func Prepare(name string, models []string, policy Policy) (string, Principal, error) {
 	if name == "" || len(name) > 100 || len(models) == 0 {
 		return "", Principal{}, errors.New("provide a name (1–100 characters) and at least one model scope")
 	}
@@ -218,14 +221,45 @@ func (s *Store) Create(name string, models []string, policy Policy) (string, Pri
 	}
 	id := hex.EncodeToString(idb)
 	token := "h2a_" + id + "_" + base64.RawURLEncoding.EncodeToString(secret)
-	digest := sha256.Sum256([]byte(token))
-	p := Principal{ID: id, Name: name, CreatedAt: time.Now().UTC(), Models: models, Permissions: []string{"models:read", "completions:create"}, Policy: policy}
+	p := Principal{ID: id, Name: name, CreatedAt: time.Now().UTC(), Models: append([]string(nil), models...), Permissions: []string{"models:read", "completions:create"}, Policy: policy}
+	return token, p, nil
+}
+
+// InsertPrepared inserts a new identity only. It must not be used to resume a
+// failed setup: a missing record can represent a deliberate revocation.
+func (s *Store) InsertPrepared(token string, p Principal) error {
+	m := tokenPattern.FindStringSubmatch(token)
+	if m == nil || m[1] != p.ID || p.Name == "" || len(p.Name) > 100 || p.CreatedAt.IsZero() || len(p.Models) == 0 || p.Policy.validate() != nil {
+		return errors.New("invalid prepared key")
+	}
+	for _, v := range p.Models {
+		if !scopePattern.MatchString(v) {
+			return errors.New("invalid prepared key")
+		}
+	}
+	if len(p.Permissions) != 2 || p.Permissions[0] != "models:read" || p.Permissions[1] != "completions:create" {
+		return errors.New("invalid prepared key")
+	}
 	lock, e := s.lock(".transaction.lock", true)
+	if e != nil {
+		return e
+	}
+	defer unlockFile(lock)
+	if _, e = os.Lstat(filepath.Join(s.Directory, p.ID+".json")); e == nil {
+		return errors.New("key already exists")
+	} else if !errors.Is(e, os.ErrNotExist) {
+		return e
+	}
+	digest := sha256.Sum256([]byte(token))
+	return s.write(record{Principal: p, Digest: hex.EncodeToString(digest[:])})
+}
+
+func (s *Store) Create(name string, models []string, policy Policy) (string, Principal, error) {
+	token, p, e := Prepare(name, models, policy)
 	if e != nil {
 		return "", Principal{}, e
 	}
-	defer unlockFile(lock)
-	if e = s.write(record{Principal: p, Digest: hex.EncodeToString(digest[:])}); e != nil {
+	if e = s.InsertPrepared(token, p); e != nil {
 		return "", Principal{}, e
 	}
 	return token, p, nil
