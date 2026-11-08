@@ -116,6 +116,11 @@ class FactoryCLI(unittest.TestCase):
         result = self.cli('seed', '--repo', 'acme/repo', '--apply', ok=False)
         self.assertIn('pending', result.stderr)
         self.assertEqual(self.get_state(), state)
+        plan = self.cli('plan', '--repo', 'acme/repo')
+        self.assertIn('recover --repo acme/repo --id first --issue NUMBER', plan.stdout)
+        self.assertIn('recover --repo acme/repo --id first --confirm-absent', plan.stdout)
+        self.assertNotIn('adopt --repo acme/repo --id first', plan.stdout)
+        self.assertNotIn('seed --repo acme/repo --apply --confirm-absent first', plan.stdout)
         self.cli('recover', '--repo', 'acme/repo', '--id', 'first', '--issue', '2', ok=False)
         state['issues'][0]['body'] = 'marker removed'
         state['issues'].append(dict(number=2, body='<!-- h2a-seed:first --> <!-- h2a-seed:first -->', state='open', html_url='url'))

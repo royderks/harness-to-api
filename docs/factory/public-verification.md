@@ -40,3 +40,7 @@ The CI and factory workflows use `pull_request` and `push`, GitHub-hosted runner
 Claim coordination, the project-worker ceiling, independent review, and human merge are operating rules. Personal-repository permissions do not provide separate Triage and Maintain roles. GitHub's existing approval and token behavior still applies to external fork workflows.
 
 Importer fixtures establish local decisions under simulated GitHub responses. They cannot establish distributed exactly-once publication. A maintainer must retain the journal, inspect adoption and absence decisions, and use one publisher across machines. Untracked forged markers can require reconciliation; they cannot redirect a journal-pinned identity.
+
+## Independent review
+
+A separate GPT-6.1 Terra review of `85252d6` found one usability defect: pending publication guidance suggested adoption commands that the pending-state guard would reject. The CLI now prints state-specific recovery commands, covered by the lost-response test. The review found no other actionable issues and checked the reference-project comparisons against their pinned source files.

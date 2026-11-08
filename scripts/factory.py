@@ -231,10 +231,14 @@ def reconcile(journal, issues, allow_pending=False):
     return mapped
 
 
-def show_candidates(target, key, markers):
+def show_candidates(target, key, markers, pending=False):
     numbers = sorted(markers.get(key, set()))
     if numbers:
         print(f"{key}: untrusted candidates " + ", ".join(f"#{n}" for n in numbers))
+    if pending:
+        print(f"  Inspect, then recover: python3 scripts/factory.py recover --repo {target} --id {key} --issue NUMBER")
+        print(f"  Or confirm settled absence: python3 scripts/factory.py recover --repo {target} --id {key} --confirm-absent")
+    elif numbers:
         print(f"  Inspect, then adopt: python3 scripts/factory.py adopt --repo {target} --id {key} --issue NUMBER")
         print(f"  Or assert absence: python3 scripts/factory.py seed --repo {target} --apply --confirm-absent {key}")
 
@@ -280,7 +284,7 @@ def run(args):
                 fail("recovery requires a pending seed")
             if args.command == "adopt" and entry is not None:
                 fail("adoption requires an unmapped seed")
-            show_candidates(args.repo, args.id, markers)
+            show_candidates(args.repo, args.id, markers, pending=args.command == "recover")
             if args.command == "recover" and args.confirm_absent:
                 del journal["seeds"][args.id]
                 save_journal(journal_path, journal)
@@ -310,7 +314,7 @@ def run(args):
             key = seed["id"]
             if journal["seeds"].get(key, {}).get("state") == "pending":
                 print(f"{key}: pending recovery")
-                show_candidates(args.repo, key, markers)
+                show_candidates(args.repo, key, markers, pending=True)
             elif key in mapped:
                 issue = issues[mapped[key]]
                 print(f"{key}: #{issue['number']} {issue['state']} {issue['html_url']}")
