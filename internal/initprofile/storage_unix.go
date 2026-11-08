@@ -182,6 +182,9 @@ func checkKeyFiles(root *os.Root, dir *os.File) error {
 			e = unsafePath()
 		}
 		if e == nil {
+			e = checkFile(actual)
+		}
+		if e == nil {
 			e = checkFileSecurity(f)
 		}
 		f.Close()
@@ -302,6 +305,9 @@ func (p platformStore) remove(_ string, name string) error {
 	return p.dir.Sync()
 }
 func atCall(trap uintptr, fd int, old, new string, flags uintptr) error {
+	if trap == 0 {
+		return unsafePath()
+	}
 	a, err := syscall.BytePtrFromString(old)
 	if err != nil {
 		return err

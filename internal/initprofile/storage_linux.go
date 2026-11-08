@@ -7,7 +7,7 @@ import (
 
 func fileExclusiveAt(fd int, old, new string) error { return atCall(renameat2Number, fd, old, new, 1) }
 func fileRenameAt(fd int, old, new string) error {
-	return atCall(syscall.SYS_RENAMEAT, fd, old, new, 0)
+	return atCall(renameat2Number, fd, old, new, 0)
 }
 
 func checkLocalFilesystem(dir *os.File) error {
