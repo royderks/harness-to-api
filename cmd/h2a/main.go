@@ -146,6 +146,41 @@ func selectProviders(value string) ([]string, error) {
 	return selected, nil
 }
 
+type providerBinaries struct{ codex, antigravity, pi, gemini, claude, opencode, bobExtension string }
+
+func buildAdapters(selected []string, bins providerBinaries) ([]harness.Adapter, error) {
+	configured := map[string]struct {
+		adapter harness.Adapter
+		binary  string
+	}{
+		"codex":       {harness.Codex{Binary: bins.codex}, bins.codex},
+		"antigravity": {harness.Antigravity{Binary: bins.antigravity}, bins.antigravity},
+		"ibm-bob":     {harness.IBMBob{Binary: bins.pi, Extension: bins.bobExtension}, bins.pi},
+		"gemini":      {harness.Gemini{Binary: bins.gemini}, bins.gemini},
+		"claude":      {harness.Claude{Binary: bins.claude}, bins.claude},
+		"opencode":    {harness.OpenCode{Binary: bins.opencode}, bins.opencode},
+	}
+	for _, id := range selected {
+		if id == "ibm-bob" {
+			if !filepath.IsAbs(bins.bobExtension) {
+				return nil, errors.New("--pi-bob-extension must be an absolute path to the installed pi-bob package")
+			}
+			if info, err := os.Stat(filepath.Join(bins.bobExtension, "extensions", "bob.ts")); err != nil || !info.Mode().IsRegular() {
+				return nil, errors.New("--pi-bob-extension must contain extensions/bob.ts; install pi-bob first")
+			}
+		}
+	}
+	adapters := make([]harness.Adapter, 0, len(selected))
+	for _, id := range selected {
+		entry := configured[id]
+		if _, err := exec.LookPath(entry.binary); err != nil {
+			return nil, fmt.Errorf("%s CLI not found (%s); install and sign in first", id, entry.binary)
+		}
+		adapters = append(adapters, entry.adapter)
+	}
+	return adapters, nil
+}
+
 func serveCommand(args []string) error {
 	f := flags("serve")
 	state := f.String("state-dir", stateDefault(), "directory for hashed API keys")
@@ -182,34 +217,9 @@ func serveCommand(args []string) error {
 	if err := api.ValidateModels(catalog, selected); err != nil {
 		return err
 	}
-	configured := map[string]struct {
-		adapter harness.Adapter
-		binary  string
-	}{
-		"codex":       {harness.Codex{Binary: *codexBin}, *codexBin},
-		"antigravity": {harness.Antigravity{Binary: *agyBin}, *agyBin},
-		"ibm-bob":     {harness.IBMBob{Binary: *piBin, Extension: *bobExtension}, *piBin},
-		"gemini":      {harness.Gemini{Binary: *geminiBin}, *geminiBin},
-		"claude":      {harness.Claude{Binary: *claudeBin}, *claudeBin},
-		"opencode":    {harness.OpenCode{Binary: *opencodeBin}, *opencodeBin},
-	}
-	for _, id := range selected {
-		if id == "ibm-bob" {
-			if !filepath.IsAbs(*bobExtension) {
-				return errors.New("--pi-bob-extension must be an absolute path to the installed pi-bob package")
-			}
-			if info, err := os.Stat(filepath.Join(*bobExtension, "extensions", "bob.ts")); err != nil || !info.Mode().IsRegular() {
-				return errors.New("--pi-bob-extension must contain extensions/bob.ts; install pi-bob first")
-			}
-		}
-	}
-	adapters := make([]harness.Adapter, 0, len(selected))
-	for _, id := range selected {
-		entry := configured[id]
-		if _, err := exec.LookPath(entry.binary); err != nil {
-			return fmt.Errorf("%s CLI not found (%s); install and sign in first", id, entry.binary)
-		}
-		adapters = append(adapters, entry.adapter)
+	adapters, err := buildAdapters(selected, providerBinaries{*codexBin, *agyBin, *piBin, *geminiBin, *claudeBin, *opencodeBin, *bobExtension})
+	if err != nil {
+		return err
 	}
 	store := auth.NewStore(*state)
 	list, err := store.List()
