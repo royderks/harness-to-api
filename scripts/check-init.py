@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import re
 import shlex
 import shutil
 import signal
@@ -133,7 +134,7 @@ def main():
             state, number = root / 'main', port()
             proc = start(state, number)
             event(proc, 'plan')
-            event(proc, 'ready')
+            ready = event(proc, 'ready')
             token, identifier = credential(state)
             check(not marker.exists(), 'startup invoked inference without consent')
             before = inspect(state, identifier)
@@ -142,6 +143,9 @@ def main():
             elapsed = time.monotonic() - proc.proof[4]
             after = inspect(state, identifier)
             check(after['accepted'] == 1, 'request did not debit quota')
+            example = subprocess.run(['python3', '-c', ready['client_example']], env=env, text=True, capture_output=True, timeout=12)
+            streams.extend([example.stdout, example.stderr])
+            check(example.returncode == 0, 'printed client example failed')
             second = run(*args(state, number))
             check(second.returncode == 3, 'second owner did not refuse')
             check(request(number, token) == 200, 'first owner stopped serving')
@@ -203,6 +207,8 @@ def main():
                         if key == 'expires_at':
                             obj[key] = '2000-01-01T00:00:00Z'
                             count += 1
+                        elif key == 'created_at':
+                            obj[key] = '1999-12-31T23:00:00Z'
                         else:
                             count += expire(value)
                 elif isinstance(obj, list):
@@ -216,6 +222,33 @@ def main():
             refused = run(*args(expired_state, number))
             check(refused.returncode == 3 and 'expir' in (refused.stdout + refused.stderr).lower(), 'expired setup did not require repair')
             print('PASS: exhausted and expired isolated setups require repair')
+
+            for interrupted, missing in [('pending-valid', None), ('pending-no-key', 'key'), ('pending-no-credential', 'credential')]:
+                interrupted_state = root / interrupted
+                shutil.copytree(state, interrupted_state)
+                profile_path = interrupted_state / 'init' / 'profile.json'
+                profile = json.loads(profile_path.read_text())
+                profile['phase'] = 'pending'
+                profile_path.write_text(json.dumps(profile))
+                if missing == 'key':
+                    (interrupted_state / 'keys' / (identifier + '.json')).unlink()
+                elif missing == 'credential':
+                    (interrupted_state / 'init' / 'client.key').unlink()
+                if missing is None:
+                    resumed = start(interrupted_state, number)
+                    event(resumed, 'ready')
+                    check(inspect(interrupted_state, identifier)['accepted'] == after['accepted'], 'pending recovery reset usage')
+                    check(stop(resumed) == 0, 'pending recovery did not stop')
+                    check(json.loads(profile_path.read_text())['phase'] == 'ready', 'pending recovery did not finish')
+                else:
+                    refused = run(*args(interrupted_state, number))
+                    check(refused.returncode == 3, 'ambiguous interrupted setup was reused')
+                    count = len(list((interrupted_state / 'keys').glob('*.json')))
+                    check(count == (0 if missing == 'key' else 1), 'interrupted setup created a key')
+                repair = run('init', 'repair', '--state-dir', str(interrupted_state), '--discard', '--yes', '--json')
+                check(repair.returncode == 0, 'interrupted setup repair failed')
+                check(not profile_path.exists(), 'repair retained profile')
+            print('PASS: pending recovery preserves accounting and never restores a missing key')
 
             hang_state, hang_port = root / 'hang', port()
             previous_calls = len(marker.read_text().splitlines())
@@ -261,6 +294,7 @@ def main():
                 check(all(secret not in str(process.args) for secret in secrets), 'credential leaked in process arguments')
             for stream in streams:
                 check(all(secret not in stream for secret in secrets), 'credential leaked in CLI output')
+                check(re.search(r'h2a_[a-f0-9]{32}_[A-Za-z0-9_-]{43}', stream) is None, 'uncollected credential leaked in output')
             for path in root.rglob('profile.json'):
                 check(all(secret not in path.read_text() for secret in secrets), 'credential leaked in profile')
             print('PASS: malformed arguments and secret-free captured output/profile')
