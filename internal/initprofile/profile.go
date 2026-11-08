@@ -3,6 +3,9 @@ package initprofile
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
@@ -29,10 +32,28 @@ type Profile struct {
 }
 
 var ErrRepair = errors.New("onboarding state requires repair")
+var (
+	ErrMissing   = fmt.Errorf("onboarding credential or key is missing: %w", ErrRepair)
+	ErrMismatch  = fmt.Errorf("onboarding profile, credential, or key does not match: %w", ErrRepair)
+	ErrExpired   = fmt.Errorf("onboarding key has expired: %w", ErrRepair)
+	ErrExhausted = fmt.Errorf("onboarding key request allowance is exhausted: %w", ErrRepair)
+)
 
 // Validate checks identity before any repair can act on the recorded key.
 func (p Profile) Validate() error {
 	if p.Version != 1 || (p.Phase != Pending && p.Phase != Ready && p.Phase != Discarding) || p.Port < 1 || p.Port > 65535 || !auth.ModelPattern.MatchString(p.Model) || !strings.HasPrefix(p.Model, p.Provider+"/") || p.Provider == "" {
+		return ErrRepair
+	}
+	switch p.Provider {
+	case "codex", "antigravity", "gemini", "claude", "opencode":
+		if p.BobExtension != "" {
+			return ErrRepair
+		}
+	case "ibm-bob":
+		if !filepath.IsAbs(p.BobExtension) {
+			return ErrRepair
+		}
+	default:
 		return ErrRepair
 	}
 	principal := p.Principal
@@ -49,16 +70,34 @@ func (p Profile) Validate() error {
 // Resume verifies immutable identity and existing durable usage without writing.
 // No recovery path creates a key when the record or credential is missing.
 func Resume(store *auth.Store, p Profile, token string) (auth.Inspection, error) {
-	if err := p.Validate(); err != nil || p.Phase == Discarding || token == "" {
-		return auth.Inspection{}, ErrRepair
+	if err := p.Validate(); err != nil || p.Phase == Discarding {
+		return auth.Inspection{}, ErrMismatch
 	}
-	principal, err := store.Authenticate(token)
-	if err != nil || !reflect.DeepEqual(principal, p.Principal) {
-		return auth.Inspection{}, ErrRepair
+	if token == "" {
+		return auth.Inspection{}, ErrMissing
 	}
 	inspection, err := store.Inspect(p.Principal.ID)
-	if err != nil || !reflect.DeepEqual(inspection.Principal, p.Principal) || inspection.Expired || inspection.RemainingRequests == nil || *inspection.RemainingRequests == 0 {
-		return auth.Inspection{}, ErrRepair
+	if errors.Is(err, os.ErrNotExist) {
+		return auth.Inspection{}, ErrMissing
+	}
+	if err != nil || !reflect.DeepEqual(inspection.Principal, p.Principal) {
+		return auth.Inspection{}, ErrMismatch
+	}
+	if inspection.Expired {
+		return auth.Inspection{}, ErrExpired
+	}
+	if inspection.RemainingRequests == nil {
+		return auth.Inspection{}, ErrMismatch
+	}
+	if *inspection.RemainingRequests == 0 {
+		return auth.Inspection{}, ErrExhausted
+	}
+	principal, err := store.Authenticate(token)
+	if errors.Is(err, auth.ErrExpiredKey) {
+		return auth.Inspection{}, ErrExpired
+	}
+	if err != nil || !reflect.DeepEqual(principal, p.Principal) {
+		return auth.Inspection{}, ErrMismatch
 	}
 	return inspection, nil
 }
