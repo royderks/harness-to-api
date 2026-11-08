@@ -1,0 +1,19 @@
+name: Factory validation
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  validate:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install stable --profile minimal
+      - run: rustup default stable
+      - run: cargo build --locked --bin h2a
+      - run: target/debug/h2a factory validate
+      - run: python3 -m unittest discover -s scripts/tests -v
+        env:
+          H2A_BIN: ${{ github.workspace }}/target/debug/h2a

@@ -12,7 +12,7 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 
-const HELP: &str = "h2a - Authenticated OpenAI-compatible harness gateway.\n\nCommands: doctor, keys, probe, serve, share, version\nUse h2a COMMAND --help for flags.";
+const HELP: &str = "h2a - Authenticated OpenAI-compatible harness gateway.\n\nCommands: doctor, keys, probe, serve, share, version, factory\nUse h2a COMMAND --help for flags.";
 
 pub async fn run(mut args: Vec<String>) -> i32 {
     if args.first().is_some_and(|s| s == "help") && args.len() > 1 {
@@ -50,6 +50,7 @@ async fn dispatch(args: &[String]) -> anyhow::Result<()> {
         "serve" => serve(rest).await,
         "doctor" => doctor(rest).await,
         "share" => share(rest),
+        "factory" => crate::factory::run(rest),
         _ => anyhow::bail!("unknown command; run h2a --help"),
     }
 }

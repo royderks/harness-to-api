@@ -1,0 +1,284 @@
+{
+  "version": 1,
+  "labels": [
+    {
+      "name": "factory:triage",
+      "color": "D4C5F9",
+      "description": "Needs scope, evidence, or prioritization"
+    },
+    {
+      "name": "factory:ready",
+      "color": "0E8A16",
+      "description": "Bounded work with available prerequisites"
+    },
+    {
+      "name": "factory:running",
+      "color": "1D76DB",
+      "description": "Claimed by the coordinator"
+    },
+    {
+      "name": "factory:review",
+      "color": "5319E7",
+      "description": "Implementation returned for independent review"
+    },
+    {
+      "name": "factory:blocked",
+      "color": "B60205",
+      "description": "Known prerequisite prevents execution"
+    },
+    {
+      "name": "priority:p1",
+      "color": "B60205",
+      "description": "Correctness and release confidence"
+    },
+    {
+      "name": "priority:p2",
+      "color": "FBCA04",
+      "description": "Next useful improvement"
+    },
+    {
+      "name": "priority:p3",
+      "color": "C2E0C6",
+      "description": "Later or product decision"
+    },
+    {
+      "name": "type:maintenance",
+      "color": "C5DEF5",
+      "description": "Verification, documentation, or maintenance"
+    },
+    {
+      "name": "type:feature",
+      "color": "A2EEEF",
+      "description": "User-facing capability"
+    },
+    {
+      "name": "type:decision",
+      "color": "D4C5F9",
+      "description": "Product choice requiring recorded rationale"
+    }
+  ],
+  "seeds": [
+    {
+      "id": "factory-foundation",
+      "title": "Establish the GitHub software-factory foundation",
+      "intent": "Preserve product intent and decisions and manage bounded work in GitHub.",
+      "sources": [
+        "GENESIS.md#g6-preserve-intent-across-agent-sessions",
+        "DECISIONS.md#factory-defaults"
+      ],
+      "scope": [
+        "GENESIS.md",
+        "DECISIONS.md",
+        "AGENTS.md",
+        "factory/",
+        "src/factory/mod.rs",
+        ".github/",
+        "docs/factory.md",
+        "docs/factory/"
+      ],
+      "acceptance": [
+        "Document product scope and architecture choices.",
+        "Provide issue intake, worker and reviewer handoffs, and a finite seed backlog.",
+        "Prove a second publication creates no duplicate issues and preserves current issue content.",
+        "Record current-head checks and independent review in a pull request. Keep workers, schedules, releases and automatic merging disabled."
+      ],
+      "verification": [
+        "h2a factory validate",
+        "python3 -m unittest discover -s scripts/tests -v",
+        "Run plan and seed twice against a test repository; compare issue IDs and bodies."
+      ],
+      "depends_on": [],
+      "labels": [
+        "factory:running",
+        "priority:p1",
+        "type:maintenance"
+      ],
+      "risk": "low"
+    },
+    {
+      "id": "openshell-bounded-demo",
+      "title": "Demonstrate bounded h2a access from OpenShell",
+      "intent": "Show a sandbox using h2a as its provider and receiving explicit policy denials. Earlier OpenShell proof covered one successful request before bounded keys were added.",
+      "sources": [
+        "GENESIS.md#g2-start-from-a-cli-and-work-from-sandboxes"
+      ],
+      "scope": [
+        "examples/openshell/",
+        "demo/",
+        "docs/openshell.md",
+        "docs/demo.md"
+      ],
+      "acceptance": [
+        "Use an isolated temporary gateway and exact-model-scoped expiring key.",
+        "From a real OpenShell sandbox, show one completion followed by quota denial and revocation denial without printing the key.",
+        "Record exact tool versions, cleanup and network route. Label fixture results separately.",
+        "Preserve unrelated Docker resources. If prerequisites fail, record the failure and continue independent work."
+      ],
+      "verification": [
+        "Run the documented OpenShell profile lint and sandbox request flow.",
+        "Record HTTP status and sanitized response shape for success, quota denial and revocation.",
+        "Check task-owned processes and sandbox/provider resources are removed."
+      ],
+      "depends_on": [],
+      "labels": [
+        "factory:ready",
+        "priority:p1",
+        "type:maintenance"
+      ],
+      "risk": "medium"
+    },
+    {
+      "id": "native-platform-proof",
+      "title": "Verify native release and Windows policy behavior",
+      "intent": "Convert cross-compilation evidence into native execution evidence before making platform support claims.",
+      "sources": [
+        "GENESIS.md#g4-keep-the-project-simple-and-demonstrable"
+      ],
+      "scope": [
+        ".github/workflows/",
+        "scripts/release.sh",
+        "src/initprofile/windows.rs",
+        "docs/verification.md"
+      ],
+      "acceptance": [
+        "Link hosted Linux, macOS and Windows test outcomes to their tested commit.",
+        "Exercise a built archive on supported native runners with help and an offline key lifecycle.",
+        "Distinguish direct-child cancellation from descendant cleanup. Reproduce any unsupported behavior before proposing a process-management fix.",
+        "Update verification records without treating all architecture targets as natively tested."
+      ],
+      "verification": [
+        "cargo test --all-targets on each native runner.",
+        "Download or build the matching archive, check its checksum, and run the smoke commands.",
+        "Record runner architecture, command output and any skipped checks."
+      ],
+      "depends_on": [],
+      "labels": [
+        "factory:ready",
+        "priority:p1",
+        "type:maintenance"
+      ],
+      "risk": "medium"
+    },
+    {
+      "id": "provider-live-evidence",
+      "title": "Resolve the remaining live provider verification gaps",
+      "intent": "Keep adapter claims tied to observed account access. Gemini, Claude, OpenCode and IBM Bob currently have protocol evidence but no successful live-account inference in this checkout.",
+      "sources": [
+        "GENESIS.md#g1-make-installed-coding-harnesses-usable-through-an-api"
+      ],
+      "scope": [
+        "docs/verification.md",
+        "docs/gemini.md",
+        "docs/claude.md",
+        "docs/opencode.md",
+        "docs/ibm-bob.md"
+      ],
+      "acceptance": [
+        "Split execution into one provider at a time after an authorized login, required project configuration and a bounded request allowance are available.",
+        "Use the ordinary authenticated h2a probe path with a one-request key and a short deadline.",
+        "Record the outcome without credentials, raw provider diagnostics or claims that request caps bound dollar spend.",
+        "Do not replace a failed live request with a fixture and call it verified."
+      ],
+      "verification": [
+        "Inspect available official CLI login status without reading credential contents.",
+        "Run one explicitly authorized h2a probe and inspect its accepted-request count."
+      ],
+      "depends_on": [],
+      "labels": [
+        "factory:blocked",
+        "priority:p2",
+        "type:maintenance"
+      ],
+      "risk": "medium"
+    },
+    {
+      "id": "docker-runtime-proof",
+      "title": "Validate the documented Docker runtime recipe",
+      "intent": "Verify the container recipe on an isolated Docker host.",
+      "sources": [
+        "GENESIS.md"
+      ],
+      "scope": [
+        "Dockerfile",
+        "deploy/compose.yaml",
+        "docs/docker.md"
+      ],
+      "acceptance": [
+        "On a healthy isolated host, build the documented image and run its offline health/key lifecycle.",
+        "Record image contents, supported adapters and credential mount requirements.",
+        "Keep provider inference opt-in. Do not reset or delete unrelated Docker state to make the check pass."
+      ],
+      "verification": [
+        "docker compose -f deploy/compose.yaml config",
+        "Run the documented image build and an isolated offline smoke check; record exact commands."
+      ],
+      "depends_on": [],
+      "labels": [
+        "factory:blocked",
+        "priority:p2",
+        "type:maintenance"
+      ],
+      "risk": "medium"
+    },
+    {
+      "id": "factory-worker-pilot",
+      "title": "Run one bounded issue through the factory handoff",
+      "intent": "Evaluate the source-to-issue-to-PR workflow before adding a scheduler or autonomous launcher.",
+      "sources": [
+        "GENESIS.md#g6-preserve-intent-across-agent-sessions"
+      ],
+      "scope": [
+        "docs/factory/",
+        "GitHub issue and pull-request metadata"
+      ],
+      "acceptance": [
+        "Select one ready issue with accepted dependencies and give one worker an isolated worktree.",
+        "Record issue, base SHA, branch, owned paths, time/request limits and verification contract before dispatch.",
+        "Obtain an independent review of the exact returned head and record the human merge outcome.",
+        "Report manual steps and observed friction. Do not implement a scheduler as part of the pilot."
+      ],
+      "verification": [
+        "Compare the issue handoff, returned commit, CI results and review findings.",
+        "Confirm there are no duplicate active workers or issue claims."
+      ],
+      "depends_on": [
+        "factory-foundation"
+      ],
+      "labels": [
+        "factory:triage",
+        "priority:p2",
+        "type:maintenance"
+      ],
+      "risk": "low"
+    },
+    {
+      "id": "public-name-and-launch",
+      "title": "Prepare the release installation channel",
+      "intent": "Distribute harness-to-api as the h2a executable with verifiable native archives.",
+      "sources": [
+        "GENESIS.md#g5-make-installation-straightforward"
+      ],
+      "scope": [
+        "scripts/release.sh",
+        ".github/workflows/release.yml",
+        "docs/distribution.md"
+      ],
+      "acceptance": [
+        "Use harness-to-api as the project name and h2a as the executable.",
+        "Provide versioned native archives and checksums.",
+        "Track package-manager setup and artifact verification in GitHub issues."
+      ],
+      "verification": [
+        "Build release archives and verify their checksums.",
+        "Check documented installation commands on supported native platforms."
+      ],
+      "depends_on": [],
+      "labels": [
+        "factory:triage",
+        "priority:p3",
+        "type:decision"
+      ],
+      "risk": "low"
+    }
+  ]
+}
