@@ -17,13 +17,13 @@ a = sys.argv[1:]
 endpoint = a[1]
 write = '--method' in a
 if endpoint == 'repos/acme/repo':
-    print(json.dumps({'id': 42, 'full_name': 'acme/repo', 'private': s.get('private', True), 'default_branch': 'main'}))
+    print(json.dumps({'id': 42, 'full_name': 'acme/repo', 'private': s.get('private', True), 'default_branch': 'main', 'permissions': {'push': s.get('push', True)}}))
 elif '/labels?' in endpoint:
-    print(json.dumps([s['labels'][:1], s['labels'][1:]]))
+    print(json.dumps(s.get('label_pages', [s['labels'][i:i+100] for i in range(0, len(s['labels']), 100)] or [[]])))
 elif '/issues?' in endpoint:
     if '--paginate' not in a or '--slurp' not in a:
         sys.exit(1)
-    print(json.dumps([s['issues'][:1], s['issues'][1:]]))
+    print(json.dumps(s.get('issue_pages', [s['issues'][i:i+100] for i in range(0, len(s['issues']), 100)] or [[]])))
 elif endpoint.endswith('/labels') and write:
     item = json.load(sys.stdin)
     s['labels'].append(item)
@@ -116,11 +116,14 @@ class FactoryCLI(unittest.TestCase):
         result = self.cli('seed', '--repo', 'acme/repo', '--apply', ok=False)
         self.assertIn('pending', result.stderr)
         self.assertEqual(self.get_state(), state)
-        self.cli('recover', '--repo', 'acme/repo', '--id', 'first', '--confirm-absent', ok=False)
         self.cli('recover', '--repo', 'acme/repo', '--id', 'first', '--issue', '2', ok=False)
+        state['issues'][0]['body'] = 'marker removed'
+        state['issues'].append(dict(number=2, body='<!-- h2a-seed:first --> <!-- h2a-seed:first -->', state='open', html_url='url'))
+        self.write_state(state)
         self.cli('recover', '--repo', 'acme/repo', '--id', 'first', '--issue', '1')
         self.cli('seed', '--repo', 'acme/repo', '--apply')
-        self.assertEqual(len(self.get_state()['issues']), 2)
+        self.assertEqual(len(self.get_state()['issues']), 3)
+        self.assertIn('https://github.com/acme/repo/issues/1', self.get_state()['issues'][2]['body'])
 
     def test_rejected_create_requires_explicit_absence_confirmation(self):
         state = self.get_state()
@@ -136,12 +139,13 @@ class FactoryCLI(unittest.TestCase):
         self.cli('seed', '--repo', 'acme/repo', '--apply')
         self.assertEqual(len(self.get_state()['issues']), 2)
 
-    def test_public_repository_and_dependency_cycle_do_not_publish(self):
+    def test_public_repository_and_dependency_cycle(self):
         state = self.get_state()
         state['private'] = False
         self.write_state(state)
-        self.cli('seed', '--repo', 'acme/repo', '--apply', ok=False)
-        self.assertEqual(self.get_state(), state)
+        self.cli('seed', '--repo', 'acme/repo', '--apply')
+        state = self.get_state()
+        self.assertEqual(len(state['issues']), 2)
         self.manifest['seeds'][0]['depends_on'] = ['second']
         self.write_manifest()
         self.cli('validate', ok=False)
@@ -161,15 +165,20 @@ class FactoryCLI(unittest.TestCase):
 
     def test_pagination_discovers_existing_markers_and_remembers_them(self):
         state = self.get_state()
-        state['issues'] = [dict(number=1, body='unrelated', state='open', html_url='https://github.com/acme/repo/issues/1'), dict(number=2, body='<!-- h2a-seed:first -->', state='closed', html_url='https://github.com/acme/repo/issues/2')]
+        state['issues'] = [dict(number=n, body='unrelated', state='open', html_url=f'https://github.com/acme/repo/issues/{n}') for n in range(1, 101)]
+        state['issues'].append(dict(number=101, body='<!-- h2a-seed:first -->', state='closed', html_url='https://github.com/acme/repo/issues/101'))
         self.write_state(state)
+        result = self.cli('seed', '--repo', 'acme/repo', '--apply', ok=False)
+        self.assertIn('#101', result.stdout)
+        self.assertEqual(self.get_state()['writes'], [])
+        self.cli('adopt', '--repo', 'acme/repo', '--id', 'first', '--issue', '101')
         self.cli('seed', '--repo', 'acme/repo', '--apply')
         state = self.get_state()
-        self.assertEqual(len(state['issues']), 3)
-        state['issues'][1]['body'] = 'edited'
+        self.assertEqual(len(state['issues']), 102)
+        state['issues'][100]['body'] = 'edited'
         self.write_state(state)
         self.cli('seed', '--repo', 'acme/repo', '--apply')
-        self.assertEqual(len(self.get_state()['issues']), 3)
+        self.assertEqual(len(self.get_state()['issues']), 102)
 
     def test_invalid_inputs_and_duplicate_markers_fail_before_writes(self):
         self.manifest['seeds'][0]['sources'] = ['../escape']
@@ -183,6 +192,70 @@ class FactoryCLI(unittest.TestCase):
         self.write_state(state)
         self.cli('seed', '--repo', 'acme/repo', '--apply', ok=False)
         self.assertEqual(self.get_state()['writes'], [])
+
+    def test_forged_markers_cannot_redirect_pins(self):
+        self.cli('seed', '--repo', 'acme/repo', '--apply')
+        state = self.get_state()
+        state['issues'][0]['body'] = 'edited'
+        state['issues'].append(dict(number=3, body='<!-- h2a-seed:first --> <!-- h2a-seed:first --> <!-- h2a-seed:second -->', state='open', html_url='https://github.com/acme/repo/issues/3'))
+        self.write_state(state)
+        result = self.cli('plan', '--repo', 'acme/repo')
+        self.assertIn('first: #1', result.stdout)
+        self.cli('seed', '--repo', 'acme/repo', '--apply')
+        self.assertEqual(self.get_state(), state)
+
+    def test_candidates_adoption_and_scoped_absence(self):
+        state = self.get_state()
+        state['issues'] = [dict(number=n, body='<!-- h2a-seed:first --> <!-- h2a-seed:unknown -->', state='open', html_url=f'https://github.com/acme/repo/issues/{n}') for n in (1, 2)]
+        state['issues'].append(dict(number=3, body='<!-- h2a-seed:second -->', state='open', html_url='url', pull_request={}))
+        self.write_state(state)
+        result = self.cli('plan', '--repo', 'acme/repo')
+        self.assertIn('#1, #2', result.stdout)
+        self.assertIn('python3 scripts/factory.py adopt', result.stdout)
+        for args in [('--confirm-absent', 'unknown'), ('--confirm-absent', 'second'), ('--confirm-absent', 'first', '--confirm-absent', 'first')]:
+            self.cli('seed', '--repo', 'acme/repo', '--apply', *args, ok=False)
+        self.cli('seed', '--repo', 'acme/repo', '--confirm-absent', 'first', ok=False)
+        self.cli('adopt', '--repo', 'acme/repo', '--id', 'unknown', '--issue', '1', ok=False)
+        self.cli('adopt', '--repo', 'acme/repo', '--id', 'first', '--issue', '3', ok=False)
+        self.cli('adopt', '--repo', 'acme/repo', '--id', 'first', '--issue', '99', ok=False)
+        self.assertEqual(self.get_state()['writes'], [])
+        self.cli('seed', '--repo', 'acme/repo', '--apply', '--confirm-absent', 'first')
+        self.assertEqual(len(self.get_state()['issues']), 5)
+        self.cli('adopt', '--repo', 'acme/repo', '--id', 'second', '--issue', '4', ok=False)
+        self.cli('seed', '--repo', 'acme/repo', '--apply', '--confirm-absent', 'first', ok=False)
+
+    def test_read_only_and_recover_copied_markers(self):
+        state = self.get_state()
+        state['push'] = False
+        state['issues'] = [dict(number=1, body='<!-- h2a-seed:first -->', state='open', html_url='url')]
+        self.write_state(state)
+        self.cli('plan', '--repo', 'acme/repo')
+        self.cli('seed', '--repo', 'acme/repo', '--apply', '--confirm-absent', 'first', ok=False)
+        self.assertEqual(self.get_state()['writes'], [])
+        self.cli('adopt', '--repo', 'acme/repo', '--id', 'first', '--issue', '1')
+        self.cli('adopt', '--repo', 'acme/repo', '--id', 'second', '--issue', '1', ok=False)
+
+        journal = self.root / '.git/h2a-factory-journal.json'
+        data = json.loads(journal.read_text())
+        data['seeds']['second'] = {'state': 'pending'}
+        journal.write_text(json.dumps(data))
+        state = self.get_state()
+        state['issues'].append(dict(number=2, body='<!-- h2a-seed:second --> <!-- h2a-seed:second -->', state='open', html_url='url2'))
+        self.write_state(state)
+        self.cli('seed', '--repo', 'acme/repo', '--apply', '--confirm-absent', 'second', ok=False)
+        self.cli('recover', '--repo', 'acme/repo', '--id', 'second', '--confirm-absent')
+        self.cli('seed', '--repo', 'acme/repo', '--apply', ok=False)
+        state['issues'][1]['body'] = 'edited'
+        self.write_state(state)
+        self.cli('adopt', '--repo', 'acme/repo', '--id', 'second', '--issue', '2')
+
+    def test_incomplete_inventory_fails_before_writes(self):
+        for field, value in [('private', 'false'), ('issue_pages', []), ('issue_pages', [[{'number': 1}], []]), ('label_pages', [[], []])]:
+            with self.subTest(field=field):
+                state = {'issues': [], 'labels': [], 'writes': [], field: value}
+                self.write_state(state)
+                self.cli('seed', '--repo', 'acme/repo', '--apply', ok=False)
+                self.assertEqual(self.get_state()['writes'], [])
 
     def test_corrupt_journal_and_missing_mapped_issue_stop_writes(self):
         self.cli('seed', '--repo', 'acme/repo', '--apply')

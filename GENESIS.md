@@ -38,6 +38,12 @@ Roy requested a software-factory foundation based on the source, queue, and work
 
 Proceed with authorized reversible work without repeatedly asking for permission. Record choices and results so Roy can inspect or redirect them later. Escalate actual irreversible actions and unresolved product decisions. Keep independent work moving.
 
+## G7. Support a public contributor community
+
+On 2026-11-08, Roy clarified that the repository will be public and requested contributor and maintainer roles, issue voting, and participation by external coding agents. He asked to examine T3 Code and Ghostty as references. Public participation is the intended direction; the earlier private setup was preparation, not the intended long-term access model.
+
+People must be able to express demand and contribute through GitHub. External agents need a documented way to find scoped work and submit evidence. Product direction and access grants remain human decisions. The initial bring-your-own-compute workflow and voting mechanics are implementation choices recorded in DECISIONS.
+
 ## Coordinator defaults
 
 The following ordering is an implementation default introduced with the factory foundation. It is not a claim that Roy supplied this exact ranking.

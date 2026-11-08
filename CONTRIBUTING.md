@@ -1,5 +1,17 @@
 # Contributing
 
+Read [governance](GOVERNANCE.md) for roles, voting, and issue claims. People and coding agents use the same issue-to-PR process. Agent operators also follow [AI_POLICY.md](AI_POLICY.md) and the [external-agent guide](docs/factory/external-agents.md).
+
+## Choose work and submit evidence
+
+1. Search existing issues. Support an existing request with a thumbs-up on its opening description, rather than another issue or a `+1` comment.
+2. For substantial work, use an issue marked `factory:ready` or agree on scope with a maintainer first. Keep each PR focused on one problem. Report small obvious fixes in a linked issue too; they do not need a separate design proposal.
+3. Comment with your approach and coordinate with existing assignees. Implement in a fork and an isolated branch/worktree. A comment alone does not reserve the issue.
+4. Open a PR with the issue link, the behavior changed, reproduction or before/after evidence, exact checks and results, and known limitations. Use the PR template and disclose AI assistance when used.
+5. Respond to review. A maintainer decides whether to merge after independent review and current-head checks. First-time contributors do not need a vouch, and passing CI alone does not guarantee acceptance.
+
+## Develop locally
+
 Use Go 1.24 or newer. The gateway has no third-party Go modules. End users can use a prebuilt binary; only source builds need Go.
 
 ```sh

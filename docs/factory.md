@@ -8,7 +8,7 @@ This guide turns product intent into bounded, reviewable work. The foundation in
 | --- | --- | --- |
 | [GENESIS](../GENESIS.md) | Product intent reconstructed from Roy's requests | Roy, or an agent recording Roy's new direction |
 | [DECISIONS](../DECISIONS.md) | Choices, reasons, provenance, and open questions | The agent making a choice, with evidence |
-| [GitHub Issues](https://github.com/royderks/harness-to-api/issues) | Current scope, priority, dependencies, claims, and status | One active coordinator and the human |
+| [GitHub Issues](https://github.com/royderks/harness-to-api/issues) | Current scope, priority, dependencies, claims, and status | Maintainers and contributors within their GitHub permissions |
 | [Seed manifest](../factory/seeds.json) | Finite initial backlog and stable publication IDs | Bootstrap maintainer |
 | Pull requests and CI | Proposed implementation, review, and verification | Assigned worker, independent reviewer, human merger |
 | [Decision trail](factory/decisions.tsv) | Checkpoints from this foundation build | This run's coordinator |
@@ -20,7 +20,7 @@ flowchart LR
   Human[Human product direction] --> Source[GENESIS and DECISIONS]
   Source --> Coordinator[One coordinator]
   Coordinator --> Queue[GitHub Issues]
-  Queue --> Worker[At most two isolated workers]
+  Queue --> Worker[At most two project-dispatched workers]
   Worker --> PR[Pull request and proof]
   PR --> Review[Independent review and CI]
   Review --> Merge[Human merge]
@@ -28,6 +28,8 @@ flowchart LR
 ```
 
 h2a is the product being developed. Its text-completion endpoint is not a coding-worker launcher. Workers use their normal coding harness and repository tools. A sandbox can separately use h2a as a completion provider, subject to the [API contract](api.md).
+
+For public participation, start with [governance](../GOVERNANCE.md), [contributing](../CONTRIBUTING.md), and the [external-agent guide](factory/external-agents.md). Community forks use their own resources and are not counted against the project dispatch ceiling. The [T3 Code and Ghostty comparison](factory/community-research.md) records the policies considered.
 
 ## Prepare a checkout
 
@@ -40,7 +42,7 @@ gh auth status
 python3 scripts/factory.py plan --repo royderks/harness-to-api
 ```
 
-The repository argument is required for network commands. This first bootstrap requires a private target. The plan reads GitHub and reports existing issues and missing publications. It does not assign workers or certify that an issue is ready.
+The repository argument is required for network commands. Public and private targets are supported. Backlog publication is a maintainer operation: `seed --apply` requires API-reported repository push permission. The plan reads GitHub and reports journal-pinned issues, untracked marker candidates, and missing publications. It does not assign workers or certify that an issue is ready.
 
 ## Publish the finite backlog
 
@@ -54,9 +56,29 @@ python3 scripts/factory.py plan --repo royderks/harness-to-api
 
 The first command is a dry run. The explicit `--apply` creates missing labels and issues. Existing issue titles, bodies, labels, and closed states remain untouched. Dependencies in new issues link to the already published issues. After publication, edit current work in GitHub. Changing a seed does not update a published issue.
 
-The CLI records publication identity in `h2a-factory-journal.json` under the Git common directory. That journal is not a second status board. It remembers seed IDs, pending creation attempts, and confirmed issue numbers. Retain it on the publishing machine. A fresh clone can rediscover markers still present in issue bodies; it cannot prove the identity of an issue whose marker and local mapping were both lost.
+The CLI records publication identity in `h2a-factory-journal.json` under the Git common directory. That journal is not a second status board. It remembers seed IDs, pending creation attempts, and confirmed issue numbers. Retain it on the publishing machine. Issue-body markers are untrusted hints, including on private repositories. A fresh clone can discover candidates but never adopts them automatically. Only confirmed journal entries establish identity. A copied marker cannot redirect a pinned mapping, and edits or closure do not remove that mapping.
 
-Run one publisher per repository. A local lock excludes overlapping writes from the same checkout, but is not a distributed lock. The tool lists all issue pages, including closed issues, and refuses duplicate or conflicting identities.
+Run one publisher per repository. A local lock excludes overlapping writes from the same checkout, but is not a distributed lock. The tool lists all issue pages, including closed issues. It rejects missing pinned issues and duplicate local mappings. It tolerates copied or multiple body markers as untrusted candidate hints. Retaining the journal matters: without both a marker and a journal mapping, the tool cannot discover a prior publication. Inspect repository history before publishing from a fresh clone.
+
+## Adopt an existing issue
+
+When a seed has untracked marker candidates, `plan` shows their numbers. Inspect the issue, its history, and the seed intent. Bind the correct issue explicitly:
+
+```sh
+python3 scripts/factory.py adopt --repo royderks/harness-to-api \
+  --id SEED_ID --issue ISSUE_NUMBER
+```
+
+Adoption writes only the local journal. It requires a known, unmapped seed and an existing non-PR issue not already mapped to another seed. A marker is optional, so an operator can restore an identity after its body was edited. Adoption is an operator decision, not proof derived from the issue author or body.
+
+If all candidates are unrelated copies and no prior publication exists, use a scoped assertion after inspecting them:
+
+```sh
+python3 scripts/factory.py seed --repo royderks/harness-to-api --apply \
+  --confirm-absent SEED_ID
+```
+
+Repeat the flag for each affected seed. It applies only to that invocation and cannot override a confirmed or pending mapping. All unresolved candidates and pending attempts block remote writes before labels or issues are created. Community contributors do not need to run any of these publication commands.
 
 ## Recover an interrupted publication
 
@@ -69,21 +91,21 @@ python3 scripts/factory.py recover --repo royderks/harness-to-api \
   --id SEED_ID --issue ISSUE_NUMBER
 ```
 
-Recovery verifies the pending seed and the issue's unique marker. If the request definitively failed without creating an issue, inspect GitHub and confirm that no earlier request remains in flight. Only then clear the pending attempt:
+Recovery verifies a pending seed and an existing, unmapped non-PR issue. The operator selects its identity explicitly; copied or removed markers do not prevent recovery. If the request definitively failed without creating an issue, inspect GitHub and confirm that no earlier request remains in flight. Only then clear the pending attempt:
 
 ```sh
 python3 scripts/factory.py recover --repo royderks/harness-to-api \
   --id SEED_ID --confirm-absent
 ```
 
-This is an operator assertion, not proof that an earlier request can never complete. The CLI refuses it when a matching marker exists. If absence is uncertain, stop publication and continue unrelated work. GitHub does not provide an issue-create idempotency key, so this workflow does not promise exactly-once creation across machines, lost local state, or unauthorized concurrent publishers.
+This is an operator assertion, not proof that an earlier request can never complete. This clears the pending entry even if copied markers exist. A subsequent publication still requires adoption or the per-seed `seed --confirm-absent` assertion for any untracked candidates. If absence is uncertain, stop publication and continue unrelated work. GitHub does not provide an issue-create idempotency key, so this workflow does not promise exactly-once creation across machines, lost local state, or unauthorized concurrent publishers.
 
 ## Take one issue through the loop
 
 1. Read GENESIS, DECISIONS, the issue, and relevant verification records. The [work form](../.github/ISSUE_TEMPLATE/work.yml) captures source, scope, acceptance checks, proof, dependencies, and risk.
 2. Give each open managed issue one status label. Use `factory:triage` for unshaped work, `factory:ready` for bounded work with available prerequisites, `factory:running` for claimed work, `factory:review` for returned implementation, and `factory:blocked` for a known missing prerequisite. Use one `priority:p1`, `priority:p2`, or `priority:p3` label.
 3. Check dependencies against their accepted result. Closed because canceled or duplicated is not completion. Resolve unknown dependency outcomes before dispatch.
-4. One coordinator claims the issue and records its base SHA, branch, worktree, owned paths, worker, and execution limits. Keep at most two active workers. Count a worker with uncertain termination as active. Run overlapping work serially.
+4. One coordinator claims the issue and records its base SHA, branch, worktree, owned paths, worker, and execution limits. Keep at most two active project-dispatched workers; independent community forks are outside this resource ceiling. Count a worker with uncertain termination as active. Run overlapping work serially.
 5. Give the worker the [handoff prompt](factory/roles.md). Authorized reversible implementation can proceed without repeated permission. Keep product choices tied to human intent.
 6. The worker returns a PR with the issue link, exact head, changed scope, commands, results, and remaining gaps. Include `Refs #NUMBER` in commits. Use `Closes #NUMBER` in the PR only when the acceptance criteria are satisfied.
 7. An independent reviewer checks the actual diff and proof at the current head. Address findings and repeat affected checks. A human merges after review and passing checks. Close the issue with evidence and update any superseded decisions.
@@ -98,7 +120,7 @@ A handoff names the permitted provider/model, time limit, request allowance, and
 
 For gateway changes, run `make check`, the relevant protocol fixtures, and the applicable CLI/HTTP checks. Factory changes run offline validation and unit tests. Record live-provider calls separately from fixtures. Do not copy credentials, prompts, or raw provider diagnostics into issues or Actions logs.
 
-The [role prompts and digest](factory/roles.md) make the handoff reproducible. [Foundation verification](factory/verification.md) records what was actually exercised and what remains unavailable.
+The [role prompts and digest](factory/roles.md) make the handoff reproducible. [Public participation verification](factory/public-verification.md) records this extension. [Foundation verification](factory/verification.md) records what was actually exercised and what remains unavailable.
 
 ## Why this foundation stays local
 

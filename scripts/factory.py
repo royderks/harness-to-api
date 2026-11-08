@@ -107,7 +107,8 @@ def gh(args, payload=None, paginated=False):
     try:
         value = json.loads(result.stdout)
         if paginated:
-            if not isinstance(value, list) or any(not isinstance(page, list) for page in value):
+            if (not isinstance(value, list) or not value or any(not isinstance(page, list) or len(page) > 100 for page in value)
+                    or any(len(page) != 100 for page in value[:-1])):
                 raise ValueError("invalid pages")
             return [item for page in value for item in page]
         return value
@@ -195,12 +196,15 @@ def save_journal(path, journal):
 
 def inventory(target):
     repo = gh([f"repos/{target}"])
-    if not isinstance(repo, dict) or repo.get("private") is not True or type(repo.get("id")) is not int or not isinstance(repo.get("full_name"), str) or not isinstance(repo.get("default_branch"), str) or not repo["default_branch"] or repo["full_name"].lower() != target.lower():
-        fail("target must be the specified private repository")
+    if not isinstance(repo, dict) or type(repo.get("private")) is not bool or type(repo.get("id")) is not int or repo.get("id", 0) <= 0 or not isinstance(repo.get("full_name"), str) or not isinstance(repo.get("default_branch"), str) or not repo["default_branch"] or repo["full_name"].lower() != target.lower():
+        fail("target must be the specified public or private repository")
     issues = gh([f"repos/{target}/issues?state=all&per_page=100"], paginated=True)
     labels = gh([f"repos/{target}/labels?per_page=100"], paginated=True)
-    if any(not isinstance(i, dict) or type(i.get("number")) is not int or not isinstance(i.get("body"), (str, type(None))) or not isinstance(i.get("state"), str) or not isinstance(i.get("html_url"), str) for i in issues) or any(not isinstance(x, dict) or not isinstance(x.get("name"), str) for x in labels):
+    if any(not isinstance(i, dict) or type(i.get("number")) is not int or i["number"] <= 0 or not isinstance(i.get("body"), (str, type(None))) or not isinstance(i.get("state"), str) or not isinstance(i.get("html_url"), str) for i in issues) or any(not isinstance(x, dict) or not isinstance(x.get("name"), str) for x in labels):
         fail("incomplete issue or label inventory")
+    all_numbers = [i["number"] for i in issues]
+    if len(set(all_numbers)) != len(all_numbers):
+        fail("duplicate issue in inventory")
     issues = [i for i in issues if "pull_request" not in i]
     by_number, markers = {}, {}
     for issue in issues:
@@ -208,17 +212,12 @@ def inventory(target):
         if number in by_number:
             fail("duplicate issue in inventory")
         by_number[number] = issue
-        found = MARKER.findall(issue.get("body") or "")
-        if len(found) > 1:
-            fail(f"multiple seed markers on issue #{number}")
-        for key in found:
-            if key in markers:
-                fail(f"duplicate marker: {key}")
-            markers[key] = number
-    return repo, by_number, markers, {x["name"] for x in labels}
+        for key in MARKER.findall(issue.get("body") or ""):
+            markers.setdefault(key, set()).add(number)
+    return repo, by_number, markers, {x["name"] for x in labels}, set(all_numbers)
 
 
-def reconcile(journal, issues, markers, allow_pending=False):
+def reconcile(journal, issues, allow_pending=False):
     mapped = {}
     for key, entry in journal["seeds"].items():
         if entry["state"] == "pending":
@@ -228,14 +227,16 @@ def reconcile(journal, issues, markers, allow_pending=False):
         number = entry["number"]
         if number not in issues:
             fail(f"mapped issue #{number} is missing")
-        if key in markers and markers[key] != number:
-            fail(f"marker conflicts with journal: {key}")
-        mapped[key] = number
-    for key, number in markers.items():
-        if number in mapped.values() and mapped.get(key) != number:
-            fail(f"issue marker conflicts with journal: {key}")
         mapped[key] = number
     return mapped
+
+
+def show_candidates(target, key, markers):
+    numbers = sorted(markers.get(key, set()))
+    if numbers:
+        print(f"{key}: untrusted candidates " + ", ".join(f"#{n}" for n in numbers))
+        print(f"  Inspect, then adopt: python3 scripts/factory.py adopt --repo {target} --id {key} --issue NUMBER")
+        print(f"  Or assert absence: python3 scripts/factory.py seed --repo {target} --apply --confirm-absent {key}")
 
 
 def body(seed, mapped, issues, repo):
@@ -265,49 +266,65 @@ def run(args):
         fail("--repo must be owner/name")
     directory = common_dir()
     journal_path = directory / "h2a-factory-journal.json"
-    mutating = args.command == "recover" or (args.command == "seed" and args.apply)
+    mutating = args.command in ("recover", "adopt") or (args.command == "seed" and args.apply)
     with lock(directory) if mutating else contextlib.nullcontext():
-        repo, issues, markers, labels = inventory(args.repo)
+        repo, issues, markers, labels, all_numbers = inventory(args.repo)
         journal = read_journal(journal_path, repo)
-        if args.command == "recover":
-            reconcile(journal, issues, markers, allow_pending=True)
+        known = {s["id"] for s in seeds}
+        mapped = reconcile(journal, issues, allow_pending=True)
+        if args.command in ("recover", "adopt"):
             entry = journal["seeds"].get(args.id)
-            if args.id not in {s["id"] for s in seeds} or entry != {"state": "pending"}:
+            if args.id not in known:
+                fail("unknown seed ID")
+            if args.command == "recover" and entry != {"state": "pending"}:
                 fail("recovery requires a pending seed")
-            if args.confirm_absent:
-                if args.id in markers:
-                    fail("marked issue exists; recover its issue number instead")
+            if args.command == "adopt" and entry is not None:
+                fail("adoption requires an unmapped seed")
+            show_candidates(args.repo, args.id, markers)
+            if args.command == "recover" and args.confirm_absent:
                 del journal["seeds"][args.id]
                 save_journal(journal_path, journal)
                 print(f"Cleared {args.id} after operator-confirmed absence; no issue was created")
                 return
-            if args.issue not in issues or markers.get(args.id) != args.issue:
-                fail("recovery requires a pending seed and an issue with its unique marker")
-            if any(v.get("number") == args.issue for v in journal["seeds"].values()):
+            if args.issue not in issues:
+                fail("selected issue does not exist or is a pull request")
+            if args.issue in mapped.values():
                 fail("issue is already mapped")
             journal["seeds"][args.id] = {"state": "confirmed", "number": args.issue}
             save_journal(journal_path, journal)
-            print(f"Recovered {args.id} as #{args.issue}")
+            print(f"{'Recovered' if args.command == 'recover' else 'Adopted'} {args.id} as #{args.issue}")
             return
-        mapped = reconcile(journal, issues, markers, allow_pending=not mutating)
+        assertions = args.confirm_absent if args.command == "seed" else []
+        if assertions and not args.apply:
+            fail("--confirm-absent requires --apply")
+        if len(set(assertions)) != len(assertions):
+            fail("duplicate --confirm-absent ID")
+        for key in assertions:
+            if key not in known or key in journal["seeds"] or not markers.get(key):
+                fail(f"invalid --confirm-absent ID: {key}; expected an unmapped seed with candidates")
+
         for label in manifest["labels"]:
             if label["name"] not in labels:
                 print(f"Missing label {label['name']}")
         for seed in seeds:
-            if journal["seeds"].get(seed["id"], {}).get("state") == "pending":
-                print(f"{seed['id']}: pending recovery")
-            elif seed["id"] in mapped:
-                issue = issues[mapped[seed["id"]]]
-                print(f"{seed['id']}: #{issue['number']} {issue['state']} {issue['html_url']}")
+            key = seed["id"]
+            if journal["seeds"].get(key, {}).get("state") == "pending":
+                print(f"{key}: pending recovery")
+                show_candidates(args.repo, key, markers)
+            elif key in mapped:
+                issue = issues[mapped[key]]
+                print(f"{key}: #{issue['number']} {issue['state']} {issue['html_url']}")
             else:
-                print(f"{seed['id']}: missing")
+                print(f"{key}: missing")
+                show_candidates(args.repo, key, markers)
         if not mutating:
             return
-        for seed in seeds:
-            key = seed["id"]
-            if key in mapped and key not in journal["seeds"]:
-                journal["seeds"][key] = {"state": "confirmed", "number": mapped[key]}
-        save_journal(journal_path, journal)
+        reconcile(journal, issues)
+        blocked = [s["id"] for s in seeds if s["id"] not in mapped and markers.get(s["id"]) and s["id"] not in assertions]
+        if blocked:
+            fail("untrusted candidates require adoption or --confirm-absent: " + ", ".join(blocked))
+        if not isinstance(repo.get("permissions"), dict) or repo["permissions"].get("push") is not True:
+            fail("seed --apply requires repository push permission")
         for label in manifest["labels"]:
             if label["name"] not in labels:
                 gh([f"repos/{args.repo}/labels", "--method", "POST"], label)
@@ -321,27 +338,32 @@ def run(args):
             if not isinstance(issue, dict) or type(issue.get("number")) is not int or issue["number"] <= 0 or not isinstance(issue.get("html_url"), str):
                 fail(f"uncertain create for {key}; inspect GitHub and recover")
             number = issue["number"]
-            if number in issues:
+            if number in all_numbers:
                 fail(f"uncertain create for {key}; duplicate issue number")
             journal["seeds"][key] = {"state": "confirmed", "number": number}
             save_journal(journal_path, journal)
+            all_numbers.add(number)
             mapped[key], issues[number] = number, issue
             print(f"Created {key}: {issue['html_url']}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__, epilog="Retain the Git common directory journal. If a create result is uncertain, inspect GitHub and recover its marked issue before seeding again. One publisher across machines is required.")
+    parser = argparse.ArgumentParser(description=__doc__, epilog="Retain the Git common directory journal. If a create result is uncertain, inspect GitHub and recover its issue before seeding again. One publisher across machines is required.")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("validate", help="validate the manifest offline")
-    for name in ("plan", "seed", "recover"):
+    for name in ("plan", "seed", "recover", "adopt"):
         sub = commands.add_parser(name)
-        sub.add_argument("--repo", required=True, help="private repository owner/name")
+        sub.add_argument("--repo", required=True, help="repository owner/name")
         if name == "seed":
             sub.add_argument("--apply", action="store_true", help="create missing labels and issues")
+            sub.add_argument("--confirm-absent", action="append", default=[], metavar="ID", help="assert no candidate is the previously published issue")
+        if name == "adopt":
+            sub.add_argument("--id", required=True, help="unmapped seed ID")
+            sub.add_argument("--issue", type=int, required=True, help="existing issue number")
         if name == "recover":
             sub.add_argument("--id", required=True, help="pending seed ID")
             recovery = sub.add_mutually_exclusive_group(required=True)
-            recovery.add_argument("--issue", type=int, help="marked issue number")
+            recovery.add_argument("--issue", type=int, help="existing issue number")
             recovery.add_argument("--confirm-absent", action="store_true", help="clear a pending attempt only after confirming the request settled without creating an issue")
     args = parser.parse_args()
     try:
