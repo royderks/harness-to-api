@@ -21,6 +21,10 @@ func TestCLIHelper(t *testing.T) {
 			if err := run(os.Args[i+1:]); err != nil {
 				// Match main's treatment of flag help.
 				if !errors.Is(err, flag.ErrHelp) {
+					var failure *initFailure
+					if errors.As(err, &failure) {
+						os.Exit(failure.status)
+					}
 					fmt.Fprintln(os.Stderr, "h2a:", err)
 					os.Exit(1)
 				}

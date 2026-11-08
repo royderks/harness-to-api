@@ -27,6 +27,8 @@ var version = "dev"
 const help = `h2a — Your coding harness, as an authenticated OpenAI-compatible API.
 
 Usage:
+  h2a init [--provider codex --model codex/default --state-dir PATH --port 8787 --no-probe --json]
+  h2a init repair --state-dir PATH --discard --yes
   h2a doctor
   h2a keys create [--name local] [--models 'codex/*'] [--state-dir PATH]
   h2a keys list|inspect|explain [flags]
@@ -38,12 +40,12 @@ Usage:
 
 Get started:
   1. Install and sign in to an official harness CLI (for Codex: codex login).
-  2. export OPENAI_API_KEY="$(h2a keys create --name local --models 'codex/*')"
-  3. h2a serve --provider codex
-  4. Point your OpenAI client at http://127.0.0.1:8787/v1.
+  2. h2a init
+  3. Use the printed client example in another terminal; Ctrl+C stops the server.
 
-Use h2a <command> --help for flags. A new API key is printed once to stdout;
-save it securely. Set HARNESS_API_STATE_DIR to choose where key hashes are stored.
+Use h2a <command> --help for flags. Init stores a protected client credential;
+keys create prints a new key once to stdout. Keep both secret.
+Set HARNESS_API_STATE_DIR to choose the private local state directory.
 `
 
 func stateDefault() string {
@@ -75,6 +77,10 @@ func parse(f *flag.FlagSet, args []string) error {
 }
 func main() {
 	if err := run(os.Args[1:]); err != nil && !errors.Is(err, flag.ErrHelp) {
+		var failure *initFailure
+		if errors.As(err, &failure) {
+			os.Exit(failure.status)
+		}
 		fmt.Fprintln(os.Stderr, "h2a:", err)
 		os.Exit(1)
 	}
@@ -88,7 +94,7 @@ func run(args []string) error {
 	case "help":
 		if len(args) > 1 {
 			switch args[1] {
-			case "serve", "keys", "doctor", "share", "probe":
+			case "serve", "keys", "doctor", "share", "probe", "init":
 				return run(append(append([]string{}, args[1:]...), "--help"))
 			default:
 				return fmt.Errorf("unknown help topic %q; run h2a --help", args[1])
@@ -108,6 +114,8 @@ func run(args []string) error {
 		}
 		fmt.Println(version)
 		return nil
+	case "init":
+		return initCommand(args[1:])
 	case "keys":
 		return keyCommand(args[1:])
 	case "probe":
@@ -237,10 +245,8 @@ func serveCommand(args []string) error {
 	defer app.Close()
 	lifetime, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	server := &http.Server{Addr: net.JoinHostPort(*host, fmt.Sprint(*port)), Handler: app,
-		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 * 1024,
-		BaseContext: func(net.Listener) context.Context { return lifetime },
-	}
+	server := gatewayHTTPServer(lifetime, app)
+	server.Addr = net.JoinHostPort(*host, fmt.Sprint(*port))
 	listener, err := net.Listen("tcp", server.Addr)
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", server.Addr, err)
