@@ -73,6 +73,13 @@ Statuses mean implemented, operational default, proposed, or deferred. Supersede
 | D038 | Separate project roles from GitHub permissions. Start with Roy as owner/maintainer and route code review through CODEOWNERS. Consider organization roles when more granular access is needed. | Agent operating default; no access grants or transfer. | [Governance](GOVERNANCE.md#responsibilities). |
 | D039 | Support public and private targets without trusting issue-body seed markers as identity. Preserve journal pins and require explicit adoption of untracked candidates. | Agent design synthesis; same local journal format. | [Importer rationale](docs/factory/community-research.md#choices-for-h2a). |
 
+## Foreground onboarding decisions
+
+| ID | Decision and reason | Authority and status | Evidence |
+| --- | --- | --- | --- |
+| D040 | Use one foreground init profile and the existing server owner. Persist a pending identity before inserting the key; never recreate an absent key on resume because it may have been revoked. Explicit repair discards only the recorded onboarding setup. | Approved issue #11 synthesis; implementation in progress. | [Onboarding](docs/onboarding.md), [issue #11](https://github.com/royderks/harness-to-api/issues/11). |
+| D041 | Keep the auth store hash-only as in D009. Init additionally stores an optional client secret in a protected local file so an ordinary client can reconnect; it is separate from the auth store and removed by repair. | Approved issue #11 synthesis; implementation in progress. | [Onboarding](docs/onboarding.md). |
+
 ## Open decisions and evidence gaps
 
 - Public repository visibility is the chosen direction; publication has not occurred. The public name, package registries, and domains remain unselected or unprovisioned.

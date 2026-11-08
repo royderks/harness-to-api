@@ -40,14 +40,15 @@ Install the [official Codex CLI](https://learn.chatgpt.com/docs/cli), then sign 
 codex login
 ```
 
-Create a gateway key. The command prints the key once; the server stores only its hash. In a POSIX shell you can capture it directly:
+Start the foreground setup flow:
 
 ```sh
-export OPENAI_API_KEY="$(./bin/h2a keys create --name local --models 'codex/*')"
-./bin/h2a serve --provider codex
+./bin/h2a init
 ```
 
-See the [CLI guide](docs/cli.md) for command help and stdout/stderr contracts. Your base URL is `http://127.0.0.1:8787/v1`. Keep the server running. Pass the generated key to your client using its secret/environment configuration.
+It shows the provider, endpoint, state location, and bounded key policy before setup. A live probe is a separate opt-in; setup alone does not make an inference request. The endpoint is unverified until a probe succeeds. Keep the process running and stop it with Ctrl+C. See [onboarding](docs/onboarding.md) for a client example, automation, and recovery.
+
+The lower-level `keys create` and `serve` commands remain available; see the [CLI guide](docs/cli.md).
 
 Give a sandbox bounded access with an expiring key:
 

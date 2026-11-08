@@ -2,6 +2,8 @@
 
 Install and sign in to the official harness CLI first (for example, `codex login`). Run `h2a doctor` to see which executables are on your PATH. Doctor does not check login or model access. The gateway binary itself does not require Go.
 
+For a guided foreground setup, run `h2a init`. For explicit automation and its versioned NDJSON events, see [onboarding](onboarding.md). The commands below provide lower-level control.
+
 Create a key and capture it in your shell, then start the server:
 
 ```sh
