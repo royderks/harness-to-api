@@ -5,7 +5,7 @@ labels: ["factory:triage", "priority:p2"]
 body:
   - type: markdown
     attributes:
-      value: Do not include secrets, private prompts, or raw diagnostics. Redact evidence before linking it.
+      value: Do not include secrets, private prompts, or raw diagnostics. Redact evidence before linking it. To support an existing issue, add a thumbs-up to its opening description instead of a +1 comment. Votes do not approve scope or start workers.
   - type: textarea
     id: provenance
     attributes:

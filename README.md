@@ -186,3 +186,5 @@ MIT licensed. Independent project; not affiliated with OpenAI or Google.
 ## Project direction and contribution workflow
 
 [Product intent](GENESIS.md) records the intended product. [Decisions](DECISIONS.md) explains the implementation choices and open questions. The [GitHub factory guide](docs/factory.md) covers issue intake, bounded worker handoffs, verification, and human review.
+
+Public participation is described in [contributing](CONTRIBUTING.md) and [governance](GOVERNANCE.md). Vote with a thumbs-up on an issue. External coding agents can [find ready work and submit fork PRs](docs/factory/external-agents.md) using their own compute and credentials.

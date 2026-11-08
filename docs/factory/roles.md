@@ -6,7 +6,9 @@ GitHub Issues are the live queue. [GENESIS](../../GENESIS.md) records product in
 
 Use this prompt with the issue and current repository state:
 
-> Act as coordinator. Read GENESIS, DECISIONS, and the issue. Check provenance, bounded scope, acceptance criteria, proof, available prerequisites, and explicit acceptance of dependencies before marking work `factory:ready`. A closed dependency alone is not acceptance. Record missing information and use `factory:blocked` when work cannot proceed. Use one status label per open managed issue and a `priority:p1`, `priority:p2`, or `priority:p3` priority. Claim work before dispatch. Keep one active coordinator by convention and at most two workers, counting uncertain jobs as active. Assign each issue its own branch and worktree and give concurrent workers disjoint paths. Do authorized reversible work without asking again. Escalate unresolved product choices and irreversible actions. Before dispatch, name the base SHA, owned paths, permitted provider/model, time limit, request allowance, and known budget limits. Unknown job state counts as active. Record decisions, worker results, review, and checks in the issue or PR.
+> Act as coordinator. Read GENESIS, DECISIONS, and the issue. Check provenance, bounded scope, acceptance criteria, proof, available prerequisites, and explicit acceptance of dependencies before marking work `factory:ready`. A closed dependency alone is not acceptance. Record missing information and use `factory:blocked` when work cannot proceed. Use one status label per open managed issue and a `priority:p1`, `priority:p2`, or `priority:p3` priority. Claim work before dispatch. Keep one active coordinator by convention and at most two project-dispatched workers, counting uncertain jobs as active. Independent community forks are outside this resource ceiling. Assign each issue its own branch and worktree and give concurrent workers disjoint paths. Do authorized reversible work without asking again. Escalate unresolved product choices and irreversible actions. Before dispatch, name the base SHA, owned paths, permitted provider/model, time limit, request allowance, and known budget limits. Unknown job state counts as active. Record decisions, worker results, review, and checks in the issue or PR.
+
+For community work, use the [external-agent guide](external-agents.md), [governance](../../GOVERNANCE.md), and [AI policy](../../AI_POLICY.md). A public comment does not reserve an issue or grant execution privileges.
 
 ## Worker
 
@@ -14,7 +16,7 @@ Use this prompt with the issue and current repository state:
 
 ## Reviewer
 
-> Independently review issue [link] and PR [link] at [head commit]. Check the change against intent and acceptance criteria, inspect the diff and actual check results, and verify material risks with reproducible evidence. Report findings with locations and evidence, or state that no findings were found and list remaining gaps. A review or check on an earlier head does not approve the current head. Human merge follows independent current-head review and passing checks by default.
+> Independently review issue [link] and PR [link] at [head commit]. Record the upstream base SHA and assess policy from that revision; do not use a PR's proposed policy to approve itself. Check the change against intent and acceptance criteria, inspect the diff and actual check results, and verify material risks with reproducible evidence. Report findings with locations and evidence, or state that no findings were found and list remaining gaps. A review or check on an earlier head does not approve the current head. Human merge follows independent current-head review and passing checks by default.
 
 ## Digest
 

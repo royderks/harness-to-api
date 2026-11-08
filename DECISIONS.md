@@ -50,7 +50,7 @@ Statuses mean implemented, operational default, proposed, or deferred. Supersede
 | D025 | Keep GENESIS for reconstructed human intent, DECISIONS for reasoned choices, and GitHub issues for actionable work. Link work to intent or observed defects. | Agent adaptation of the referenced article; operational default. | [Factory guide](docs/factory.md). |
 | D026 | One coordinator triages and claims work. Start with at most two implementation workers, each on a separate branch or worktree. Pause dispatch on unavailable quota rather than inventing subscription capacity. | Agent conservative default; configurable later. | [Factory guide](docs/factory.md). |
 | D027 | Require independent review and passing checks on the current PR head before a human merges. Bootstrap does not launch workers, enable auto-merge, schedule jobs, or publish releases. | Agent first-release operational default; not a retrospective approval requirement. | [Factory guide](docs/factory.md). |
-| D028 | Create a private repository using the existing project name. This preserves optional public naming and launch decisions. | Agent reversible default under Roy's autonomy instruction. | [Decision trail](docs/factory/decisions.tsv). |
+| D028 | Create a private repository using the existing project name. This preserves optional public naming and launch decisions. | Agent reversible setup default; long-term private scope superseded by D034. | [Decision trail](docs/factory/decisions.tsv). |
 | D029 | Import a small seed backlog once. Preserve edited and closed GitHub issues on repeat bootstrap. Do not keep a competing local status board. | Agent idempotence choice; operational default. | [Factory guide](docs/factory.md). |
 | D030 | Keep a bounded handoff and feedback loop. Record evidence, exact commits, residual risks, next work, and decisions in durable artifacts. No claim of a running unattended factory until a scheduler and worker adapter are explicitly implemented and verified. | Agent scope choice; operational default. | [Factory guide](docs/factory.md). |
 
@@ -62,9 +62,20 @@ Statuses mean implemented, operational default, proposed, or deferred. Supersede
 | D032 | Remember published seed IDs in a private local journal. Record an attempt before issue creation and stop on an ambiguous response. This preserves human edits without claiming distributed exactly-once delivery. | Agent synthesis; implemented. | [Recovery contract](docs/factory.md#recover-an-interrupted-publication). |
 | D033 | Correct stale README and distribution claims about expiry, rate limits, and active-run revocation while establishing the source documents. | Agent maintenance choice; implemented. | [README key policy](README.md#keys-and-permissions), commit `126f747`. |
 
+## Public participation decisions, 2026-11-08
+
+| ID | Decision and reason | Authority and status | Evidence |
+| --- | --- | --- | --- |
+| D034 | Prepare for a public repository, community voting, and external coding-agent contributions. Supersedes private preparation as the long-term direction in D028. | Roy's explicit direction; implementation prepared, visibility change separate. | [Issue #9](https://github.com/royderks/harness-to-api/issues/9), [G7](GENESIS.md#g7-support-a-public-contributor-community). |
+| D035 | Use thumbs-up reactions on opening issue descriptions as a demand signal. Maintainers decide scope and priority; votes never authorize execution or merging. | Agent implementation default. | [Governance](GOVERNANCE.md#community-priorities). |
+| D036 | Accept external agents through ordinary fork PRs, with an accountable operator and their own compute and credentials. The two-worker ceiling in D026 covers project-dispatched work only. | Agent implementation default. | [External-agent guide](docs/factory/external-agents.md), [AI policy](AI_POLICY.md). |
+| D037 | Keep first contributions open while requiring scoped work and evidence. Do not adopt a vouch gate, model denylist, or automatic closure bot at launch. | Agent choice after examining T3 Code and Ghostty. | [Comparison](docs/factory/community-research.md). |
+| D038 | Separate project roles from GitHub permissions. Start with Roy as owner/maintainer and route code review through CODEOWNERS. Consider organization roles when more granular access is needed. | Agent operating default; no access grants or transfer. | [Governance](GOVERNANCE.md#responsibilities). |
+| D039 | Support public and private targets without trusting issue-body seed markers as identity. Preserve journal pins and require explicit adoption of untracked candidates. | Agent design synthesis; same local journal format. | [Importer rationale](docs/factory/community-research.md#choices-for-h2a). |
+
 ## Open decisions and evidence gaps
 
-- Public name, public repository visibility, package registries, and domains remain unselected or unprovisioned.
+- Public repository visibility is the chosen direction; publication has not occurred. The public name, package registries, and domains remain unselected or unprovisioned.
 - Public distribution requires signing and installation decisions. A private GitHub repository is not a public launch.
 - Gemini needs a valid project configuration for the tested account. Claude has no verified login. OpenCode and IBM Bob still lack successful live-account proof here.
 - The expanded OpenShell bounded-key demonstration has not yet run inside OpenShell.
