@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import queue
 import shlex
+import shutil
 import signal
 import socket
 import subprocess
@@ -32,7 +33,7 @@ def main():
         fixture, marker = root / 'fake-cli', root / 'calls'
         subprocess.run([GO, 'build', '-o', str(fixture), './internal/harness/testdata/fake-cli'], cwd=ROOT, check=True)
         wrapper = root / 'codex'
-        wrapper.write_text('#!/bin/sh\nprintf "call\\n" >> ' + shlex.quote(str(marker)) + '\nexec ' + shlex.quote(str(fixture)) + ' "$@"\n')
+        wrapper.write_text('#!/bin/sh\nprintf "%s\\n" "$$" >> ' + shlex.quote(str(marker)) + '\nexec ' + shlex.quote(str(fixture)) + ' "$@"\n')
         wrapper.chmod(0o700)
         env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ.get('PATH', ''))
         env.pop('OPENAI_API_KEY', None)
@@ -167,14 +168,75 @@ def main():
             print('PASS: unrelated port listener survives without published setup')
 
             probe_state, probe_port = root / 'probe', port()
-            calls = marker.read_text().count('call\n') if marker.exists() else 0
+            calls = len(marker.read_text().splitlines()) if marker.exists() else 0
             probe = start(probe_state, probe_port, '--probe')
             event(probe, 'probe')
             probe_token, probe_id = credential(probe_state)
-            check(marker.read_text().count('call\n') == calls + 1, 'probe did not invoke exactly one fixture request')
+            check(len(marker.read_text().splitlines()) == calls + 1, 'probe did not invoke exactly one fixture request')
             check(inspect(probe_state, probe_id)['accepted'] == 1, 'probe did not debit quota')
             check(stop(probe) == 0, 'probe process failed to stop')
             print('PASS: explicit probe makes one quota-counted fixture request')
+
+            # Edit isolated stopped fixture state to exercise otherwise hour-long policy boundaries.
+            exhausted_state = root / 'exhausted'
+            shutil.copytree(state, exhausted_state)
+            record_path = exhausted_state / 'keys' / (identifier + '.json')
+            record = json.loads(record_path.read_text())
+            record['usage']['accepted'] = 20
+            record_path.write_text(json.dumps(record))
+            refused = run(*args(exhausted_state, number))
+            check(refused.returncode == 3 and 'exhaust' in (refused.stdout + refused.stderr).lower(), 'exhausted setup did not require repair')
+
+            expired_state = root / 'expired'
+            shutil.copytree(state, expired_state)
+            profile_path = expired_state / 'init' / 'profile.json'
+            expired_record = expired_state / 'keys' / (identifier + '.json')
+            def expire(obj):
+                count = 0
+                if isinstance(obj, dict):
+                    for key, value in obj.items():
+                        if key == 'expires_at':
+                            obj[key] = '2000-01-01T00:00:00Z'
+                            count += 1
+                        else:
+                            count += expire(value)
+                elif isinstance(obj, list):
+                    for item in obj:
+                        count += expire(item)
+                return count
+            for path in (profile_path, expired_record):
+                data = json.loads(path.read_text())
+                check(expire(data) > 0, 'fixture expiry field not found')
+                path.write_text(json.dumps(data))
+            refused = run(*args(expired_state, number))
+            check(refused.returncode == 3 and 'expir' in (refused.stdout + refused.stderr).lower(), 'expired setup did not require repair')
+            print('PASS: exhausted and expired isolated setups require repair')
+
+            hang_state, hang_port = root / 'hang', port()
+            hang = start(hang_state, hang_port, model='codex/hang')
+            event(hang, 'ready')
+            hang_token, hang_id = credential(hang_state)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(request, hang_port, hang_token, 'codex/hang')
+                deadline = time.monotonic() + 5
+                while inspect(hang_state, hang_id)['accepted'] == 0:
+                    check(time.monotonic() < deadline, 'hanging request not admitted')
+                    time.sleep(.03)
+                pid = int(marker.read_text().splitlines()[-1])
+                check(stop(hang) == 0, 'signal cleanup failed')
+                future.result(timeout=8)
+                deadline = time.monotonic() + 5
+                while True:
+                    try:
+                        os.kill(pid, 0)
+                    except ProcessLookupError:
+                        break
+                    check(time.monotonic() < deadline, 'fixture process survived signal cleanup')
+                    time.sleep(.03)
+            resumed_hang = start(hang_state, hang_port, model='codex/hang')
+            event(resumed_hang, 'ready')
+            check(stop(resumed_hang) == 0, 'ownership was not released after signal')
+            print('PASS: SIGINT cancels hanging fixture and releases ownership')
 
             revoked = run('keys', 'revoke', '--state-dir', str(state), identifier)
             check(revoked.returncode == 0, 'revoke failed')
