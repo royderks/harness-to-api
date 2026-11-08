@@ -33,7 +33,7 @@ def main():
         fixture, marker = root / 'fake-cli', root / 'calls'
         subprocess.run([GO, 'build', '-o', str(fixture), './internal/harness/testdata/fake-cli'], cwd=ROOT, check=True)
         wrapper = root / 'codex'
-        wrapper.write_text('#!/bin/sh\nprintf "%s\\n" "$$" >> ' + shlex.quote(str(marker)) + '\nexec ' + shlex.quote(str(fixture)) + ' "$@"\n')
+        wrapper.write_text('#!/bin/sh\nif [ "$1" = "--version" ]; then echo "codex fixture"; exit 0; fi\nif [ "$1" = "exec" ]; then printf "%s\\n" "$$" >> ' + shlex.quote(str(marker)) + '; fi\nexec ' + shlex.quote(str(fixture)) + ' "$@"\n')
         wrapper.chmod(0o700)
         env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ.get('PATH', ''))
         env.pop('OPENAI_API_KEY', None)
