@@ -4,14 +4,20 @@ Install and sign in to an official harness first, then run `h2a init`. The inter
 
 Init listens on loopback in the foreground until Ctrl+C. Its onboarding key is scoped to the exact chosen model, expires one hour after creation, and allows 20 accepted requests, 5 per minute, one concurrent request, and 90 seconds per request. The server timeout is 90 seconds and its global concurrency is one. Accepted requests count even if they fail or are cancelled. These are admission limits, not provider dollar limits. A model scope does not isolate the harness from the host filesystem or tools.
 
-The plan and ready output identify the credential file. With the default state directory, an ordinary POSIX client can use it in a separate shell:
+The plan and ready output identify the credential file. With the default state directory, an Python standard-library client can read it in a separate shell:
 
 ```sh
-export OPENAI_API_KEY="$(cat "$HOME/.harness-to-api/init/client.key")"
-curl http://127.0.0.1:8787/v1/chat/completions \
-  -H "Authorization: Bearer $OPENAI_API_KEY" \
-  -H 'Content-Type: application/json' \
-  -d '{"model":"codex/default","messages":[{"role":"user","content":"Say hello."}]}'
+H2A_KEY_FILE="$HOME/.harness-to-api/init/client.key" python3 - <<'PYTHON'
+import json, os, pathlib, urllib.request
+key = pathlib.Path(os.environ['H2A_KEY_FILE']).read_text().strip()
+body = json.dumps({'model': 'codex/default', 'messages': [
+    {'role': 'user', 'content': 'Say hello.'}]}).encode()
+request = urllib.request.Request(
+    'http://127.0.0.1:8787/v1/chat/completions', data=body,
+    headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'})
+with urllib.request.urlopen(request) as response:
+    print(response.read().decode())
+PYTHON
 ```
 
 PowerShell equivalent:

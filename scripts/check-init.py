@@ -134,12 +134,12 @@ def main():
             proc = start(state, number)
             event(proc, 'plan')
             event(proc, 'ready')
-            elapsed = time.monotonic() - proc.proof[4]
             token, identifier = credential(state)
             check(not marker.exists(), 'startup invoked inference without consent')
             before = inspect(state, identifier)
             check(before['accepted'] == 0, 'startup consumed quota')
             check(request(number, token) == 200, 'authenticated fixture request failed')
+            elapsed = time.monotonic() - proc.proof[4]
             after = inspect(state, identifier)
             check(after['accepted'] == 1, 'request did not debit quota')
             second = run(*args(state, number))
@@ -154,7 +154,7 @@ def main():
             check((token2, identifier2) == (token, identifier), 'repeat replaced credential')
             check(resumed['accepted'] == after['accepted'] and resumed['policy']['expires_at'] == before['policy']['expires_at'], 'repeat reset usage or expiry')
             check(stop(proc) == 0, 'repeat stop failed')
-            print(f'PASS: clean launch, ownership and repeat; one offline fixture sample launch-to-ready {elapsed:.3f}s ({os.uname().sysname} {os.uname().machine}, n=1)')
+            print(f'PASS: clean launch, ownership and repeat; one offline fixture sample launch-to-first-response {elapsed:.3f}s ({os.uname().sysname} {os.uname().machine}, n=1)')
 
             occupied = socket.socket()
             occupied.bind(('127.0.0.1', 0))
