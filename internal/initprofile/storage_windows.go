@@ -48,6 +48,7 @@ type platformStore struct {
 	root       *os.Root
 	handles    []syscall.Handle
 	sid        *syscall.SID
+	owner      *syscall.SID
 	descriptor uintptr
 }
 
@@ -69,38 +70,58 @@ func (p platformStore) close() error {
 	}
 	return first
 }
-func newSecurity() (*syscall.SID, uintptr, error) {
+func newSecurity() (*syscall.SID, *syscall.SID, uintptr, error) {
 	process, err := syscall.GetCurrentProcess()
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
 	}
 	var token syscall.Token
 	if err = syscall.OpenProcessToken(process, syscall.TOKEN_QUERY, &token); err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
 	}
 	defer token.Close()
 	user, err := token.GetTokenUser()
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
 	}
 	sid, err := user.User.Sid.Copy()
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
+	}
+	var size uint32
+	err = syscall.GetTokenInformation(token, syscall.TokenOwner, nil, 0, &size)
+	if !errors.Is(err, syscall.ERROR_INSUFFICIENT_BUFFER) || size == 0 {
+		if err == nil {
+			err = unsafePath()
+		}
+		return nil, nil, 0, err
+	}
+	buf := make([]byte, size)
+	if err = syscall.GetTokenInformation(token, syscall.TokenOwner, &buf[0], size, &size); err != nil {
+		return nil, nil, 0, err
+	}
+	ownerSID := *(**syscall.SID)(unsafe.Pointer(&buf[0]))
+	if ownerSID == nil {
+		return nil, nil, 0, unsafePath()
+	}
+	owner, err := ownerSID.Copy()
+	if err != nil {
+		return nil, nil, 0, err
 	}
 	text, err := sid.String()
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
 	}
 	sddl, err := syscall.UTF16PtrFromString("O:" + text + "D:P(A;;FA;;;" + text + ")")
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
 	}
 	var sd uintptr
 	r, _, e := convertSD.Call(uintptr(unsafe.Pointer(sddl)), 1, uintptr(unsafe.Pointer(&sd)), 0)
 	if r == 0 {
-		return nil, 0, e
+		return nil, nil, 0, e
 	}
-	return sid, sd, nil
+	return sid, owner, sd, nil
 }
 func openPrivateState(path string) (string, platformStore, error) {
 	if path == "" {
@@ -122,11 +143,11 @@ func openPrivateState(path string) (string, platformStore, error) {
 	if driveType != 3 {
 		return "", platformStore{}, unsafePath()
 	}
-	sid, sd, err := newSecurity()
+	sid, owner, sd, err := newSecurity()
 	if err != nil {
 		return "", platformStore{}, err
 	}
-	p := platformStore{sid: sid, descriptor: sd}
+	p := platformStore{sid: sid, owner: owner, descriptor: sd}
 	ok := false
 	defer func() {
 		if !ok {
@@ -249,6 +270,9 @@ func (p platformStore) checkKeyFiles(path string) error {
 		}
 		if e == nil {
 			e = p.checkOwner(syscall.Handle(f.Fd()))
+			if e != nil {
+				e = fmt.Errorf("auth file owner check: %w", e)
+			}
 		}
 		f.Close()
 		if e != nil {
@@ -269,7 +293,10 @@ func (p platformStore) checkOwner(h syscall.Handle) error {
 	}
 	eq, _, _ := equalSID.Call(owner, uintptr(unsafe.Pointer(p.sid)))
 	if eq == 0 {
-		return unsafePath()
+		eq, _, _ = equalSID.Call(owner, uintptr(unsafe.Pointer(p.owner)))
+		if eq == 0 {
+			return unsafePath()
+		}
 	}
 	return nil
 }

@@ -136,3 +136,40 @@ func TestWindowsRejectsDanglingDirectoryLinkWithoutCreatingTarget(t *testing.T) 
 		t.Fatalf("link target was created or could not be inspected: %v", err)
 	}
 }
+
+func TestWindowsAuthFileOwnerChecks(t *testing.T) {
+	s, state := newTestStore(t)
+	path := filepath.Join(state, "keys", "owner-test")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	unrelated, err := syscall.StringToSid("S-1-1-0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := syscall.Handle(f.Fd())
+	p := s.platform
+	p.sid = unrelated
+	if err := p.checkOwner(h); err != nil {
+		t.Fatalf("default token owner rejected: %v", err)
+	}
+	userFile, err := s.platform.create(s.dir, "owner-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer userFile.Close()
+	p.sid, p.owner = s.platform.sid, unrelated
+	if err := p.checkOwner(syscall.Handle(userFile.Fd())); err != nil {
+		t.Fatalf("current user owner rejected: %v", err)
+	}
+	p.sid = unrelated
+	if err := p.checkOwner(h); err == nil {
+		t.Fatal("accepted unrelated owner")
+	}
+	p.owner = s.platform.sid
+	if err := p.checkSecurity(s.platform.handles[len(s.platform.handles)-1]); err == nil {
+		t.Fatal("accepted token owner in strict private directory check")
+	}
+}
