@@ -132,6 +132,7 @@ def main():
         try:
             state, number = root / 'main', port()
             proc = start(state, number)
+            event(proc, 'plan')
             event(proc, 'ready')
             elapsed = time.monotonic() - proc.proof[4]
             token, identifier = credential(state)
@@ -176,6 +177,10 @@ def main():
             check(inspect(probe_state, probe_id)['accepted'] == 1, 'probe did not debit quota')
             check(stop(probe) == 0, 'probe process failed to stop')
             print('PASS: explicit probe makes one quota-counted fixture request')
+            failed_probe = run(*args(root / 'failed-probe', port(), '--probe', 'codex/exit-error'))
+            check(failed_probe.returncode == 4, 'failed probe did not return probe-failure status')
+            check('sensitive credentials' not in failed_probe.stdout + failed_probe.stderr, 'raw provider diagnostics leaked')
+            print('PASS: failed probe is sanitized and exits with probe failure')
 
             # Edit isolated stopped fixture state to exercise otherwise hour-long policy boundaries.
             exhausted_state = root / 'exhausted'
@@ -213,6 +218,7 @@ def main():
             print('PASS: exhausted and expired isolated setups require repair')
 
             hang_state, hang_port = root / 'hang', port()
+            previous_calls = len(marker.read_text().splitlines())
             hang = start(hang_state, hang_port, model='codex/hang')
             event(hang, 'ready')
             hang_token, hang_id = credential(hang_state)
@@ -221,6 +227,9 @@ def main():
                 deadline = time.monotonic() + 5
                 while inspect(hang_state, hang_id)['accepted'] == 0:
                     check(time.monotonic() < deadline, 'hanging request not admitted')
+                    time.sleep(.03)
+                while len(marker.read_text().splitlines()) <= previous_calls:
+                    check(time.monotonic() < deadline, 'hanging fixture did not start')
                     time.sleep(.03)
                 pid = int(marker.read_text().splitlines()[-1])
                 check(stop(hang) == 0, 'signal cleanup failed')
@@ -248,6 +257,8 @@ def main():
 
             malformed = run('init', '--provider', 'codex', '--json')
             check(malformed.returncode == 2, 'incomplete flags not rejected as usage')
+            for process in processes:
+                check(all(secret not in str(process.args) for secret in secrets), 'credential leaked in process arguments')
             for stream in streams:
                 check(all(secret not in stream for secret in secrets), 'credential leaked in CLI output')
             for path in root.rglob('profile.json'):
