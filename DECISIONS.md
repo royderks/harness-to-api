@@ -77,8 +77,8 @@ Statuses mean implemented, operational default, proposed, or deferred. Supersede
 
 | ID | Decision and reason | Authority and status | Evidence |
 | --- | --- | --- | --- |
-| D040 | Use one foreground init profile and the existing server owner. Persist a pending identity before inserting the key; never recreate an absent key on resume because it may have been revoked. Explicit repair discards only the recorded onboarding setup. | Approved issue #11 synthesis; implementation in progress. | [Onboarding](docs/onboarding.md), [issue #11](https://github.com/royderks/harness-to-api/issues/11). |
-| D041 | Keep the auth store hash-only as in D009. Init additionally stores an optional client secret in a protected local file so an ordinary client can reconnect; it is separate from the auth store and removed by repair. | Approved issue #11 synthesis; implementation in progress. | [Onboarding](docs/onboarding.md). |
+| D040 | Use one foreground init profile and the existing server owner. Persist a pending identity before inserting the key; never recreate an absent key on resume because it may have been revoked. Explicit repair discards only the recorded onboarding setup. | Agent synthesis for approved issue #11; implemented, verification recorded in the PR. | [Onboarding](docs/onboarding.md), [issue #11](https://github.com/royderks/harness-to-api/issues/11). |
+| D041 | Keep the auth store hash-only as in D009. Init additionally stores an optional client secret in a protected local file so an ordinary client can reconnect; it is separate from the auth store and removed by repair. | Agent synthesis for approved issue #11; implemented, verification recorded in the PR. | [Onboarding](docs/onboarding.md). |
 
 ## Open decisions and evidence gaps
 

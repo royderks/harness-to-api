@@ -5,6 +5,8 @@ import json
 import os
 from pathlib import Path
 import queue
+import pty
+import select
 import re
 import shlex
 import shutil
@@ -169,6 +171,7 @@ def main():
             with socket.create_connection(occupied.getsockname(), timeout=2):
                 pass
             check(not (conflict_state / 'init' / 'profile.json').exists() and not (conflict_state / 'init' / 'client.key').exists(), 'port conflict published setup')
+            check(not list((conflict_state / 'keys').glob('*.json')), 'port conflict created a key')
             occupied.close()
             print('PASS: unrelated port listener survives without published setup')
 
@@ -280,13 +283,54 @@ def main():
             check(stop(resumed_hang) == 0, 'ownership was not released after signal')
             print('PASS: SIGINT cancels hanging fixture and releases ownership')
 
+            # keys create has an explicit secret-only stdout contract; capture it
+            # privately and check only its diagnostic stream for leakage.
+            other = subprocess.run([BIN, 'keys', 'create', '--state-dir', str(state), '--name', 'unrelated', '--models', 'codex/*'], env=env, text=True, capture_output=True, timeout=12)
+            check(other.returncode == 0, 'unrelated key creation failed')
+            other_token = other.stdout.strip()
+            secrets.append(other_token)
+            streams.append(other.stderr)
+            other_id = other_token.split('_')[1]
+            other_before = inspect(state, other_id)
             revoked = run('keys', 'revoke', '--state-dir', str(state), identifier)
             check(revoked.returncode == 0, 'revoke failed')
             refused = run(*args(state, number))
             check(refused.returncode == 3, 'revoked setup was silently replaced')
             repair = run('init', 'repair', '--state-dir', str(state), '--discard', '--yes')
             check(repair.returncode == 0 and not (state / 'init' / 'client.key').exists() and not (state / 'init' / 'profile.json').exists(), 'repair failed')
-            print('PASS: revoked setup requires explicit repair')
+            check(inspect(state, other_id) == other_before, 'repair changed an unrelated key')
+            print('PASS: revoked setup requires explicit repair; unrelated key remains unchanged')
+
+            interactive_state, interactive_port = root / 'interactive', port()
+            master, slave = pty.openpty()
+            interactive = subprocess.Popen([BIN, 'init'], env=env, stdin=slave, stdout=slave, stderr=slave)
+            processes.append(interactive)
+            os.close(slave)
+            transcript = bytearray()
+            try:
+                os.write(master, f'codex\ncodex/default\n{interactive_port}\n{interactive_state}\ny\nn\n'.encode())
+                deadline = time.monotonic() + 12
+                while b'Ready (unverified)' not in transcript:
+                    check(time.monotonic() < deadline and interactive.poll() is None, 'interactive setup did not become ready')
+                    if select.select([master], [], [], .1)[0]:
+                        transcript.extend(os.read(master, 65536))
+                interactive_token, _ = credential(interactive_state)
+                check(request(interactive_port, interactive_token) == 200, 'interactive endpoint failed')
+                interactive.send_signal(signal.SIGINT)
+                interactive.wait(timeout=8)
+                check(interactive.returncode == 0, 'interactive shutdown failed')
+                while select.select([master], [], [], .1)[0]:
+                    try:
+                        chunk = os.read(master, 65536)
+                    except OSError:
+                        break
+                    if not chunk:
+                        break
+                    transcript.extend(chunk)
+                streams.append(transcript.decode(errors='replace'))
+            finally:
+                os.close(master)
+            print('PASS: interactive terminal selection and client request')
 
             malformed = run('init', '--provider', 'codex', '--json')
             check(malformed.returncode == 2, 'incomplete flags not rejected as usage')

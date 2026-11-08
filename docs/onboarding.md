@@ -39,6 +39,8 @@ h2a init --provider codex --model codex/default --state-dir /private/path/h2a --
 
 Supply every shown choice explicitly for noninteractive operation; `--probe` opts into an actual request instead of `--no-probe`. JSON mode never prompts. Standard output is versioned NDJSON (`schema_version: 1`): `plan`, `ready`, `probe`, `stopped`, and `error` events. Ready means listening, not verified; a successful probe provides verification. Errors carry a stable code and actionable next step. A hard kill may truncate the stream.
 
+IBM Bob additionally requires `--pi-bob-extension` with the absolute path to the installed community pi-bob package. The presence of `pi` alone does not establish Bob setup.
+
 A repeat with the same configuration resumes the existing key and preserves its expiry and usage. It cannot start another server while the state directory is owned. If the key is revoked, expired, exhausted, missing, or inconsistent, init requires repair rather than silently issuing a replacement. Temporary rate exhaustion can clear with time. Stop the process, then explicitly discard its onboarding setup:
 
 ```sh
@@ -48,3 +50,11 @@ h2a init repair --state-dir /private/path/h2a --discard --yes
 Repair revokes only the recorded onboarding key and removes its profile and client credential. Without `--yes`, repair prompts on a terminal. It does not need an installed harness. A corrupt identity requires the manual steps reported by the command. You can also revoke the key with `h2a keys revoke KEY_ID`; a subsequent init requires repair. A new setup creates a new bounded key.
 
 For init, exit status 0 means normal stop or decline; 2 means usage or local model validation; 3 means a prerequisite, unsafe path, configuration mismatch, repair requirement, ownership, or port conflict; 4 means probe failure; 1 means unexpected I/O or runtime failure; and 130 means cancellation before readiness. Existing commands retain their own exit behavior.
+
+## Credential storage
+
+The nonsecret profile is `<state>/init/profile.json`; the client secret is `<state>/init/client.key`. The existing `keys/` directory keeps hashes, policies and usage. Init requires a private local filesystem and refuses unsafe existing directories, symbolic links, shared files and credentials with broad access. It does not silently change existing permissions. On Linux/macOS, its directories use mode 0700 and files use 0600. Windows uses a protected current-user DACL rather than relying on Unix mode bits. Same-user processes and administrators remain outside this protection.
+
+The profile records setup before the key is inserted. If interruption leaves a matching profile, credential and key record, repeat can finish setup. A missing key requires explicit repair because it may have been revoked. Repair records its intent before revoking the key, then removes the credential and profile. Corrupt identity cannot be guessed; inspect the recorded files before manual recovery. Forced termination can leave harness descendants; the existing [platform limits](architecture.md#operational-limits) still apply.
+
+Init's stricter storage checks apply to onboarding, not a migration of existing manual key stores. Linux credential publication supports amd64 and arm64 on ext-family, XFS, Btrfs, tmpfs, overlayfs, ZFS and ramfs filesystems; unfamiliar filesystem types fail closed. macOS requires a local filesystem and rejects any extended ACL on private objects, including harmless ACLs. Only the verified system `/tmp` and `/var` aliases are accepted as symlink ancestors. Windows requires a fixed local drive with working security descriptors. Its write-through rename does not promise POSIX directory synchronization; interrupted removal can leave an ignored tombstone until repair is retried.

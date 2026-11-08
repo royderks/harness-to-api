@@ -27,3 +27,6 @@ jobs:
       - name: Exercise bounded-key CLI and HTTP lifecycle
         if: runner.os != 'Windows'
         run: python3 scripts/check-policies.py
+      - name: Exercise foreground onboarding with offline fixtures
+        if: runner.os != 'Windows'
+        run: python3 scripts/check-init.py
