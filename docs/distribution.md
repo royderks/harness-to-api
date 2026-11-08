@@ -27,4 +27,4 @@ Those channels are planned, not already published. Avoid a remote shell installe
 
 Show one small flow: start the server, create a sandbox key, change an existing OpenAI client's base URL, and stream a real answer. Follow with the same request using the second harness. Emphasize interoperability and existing official login; do not promise unlimited API access or universal subscription/model eligibility.
 
-Useful next contributions are additional official harness adapters, native message-role fidelity where supported, stronger isolation, expiring keys, and per-key budgets. Keep the initial compatibility claims narrow enough that people can reproduce them.
+Useful next contributions are additional official harness adapters, native message-role fidelity where supported, stronger isolation, native platform verification, and provider usage visibility. Keep the initial compatibility claims narrow enough that people can reproduce them.
