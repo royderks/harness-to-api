@@ -292,6 +292,30 @@ def main():
             streams.append(other.stderr)
             other_id = other_token.split('_')[1]
             other_before = inspect(state, other_id)
+            profile_path = state / 'init' / 'profile.json'
+            credential_path = state / 'init' / 'client.key'
+            saved_profile = profile_path.read_bytes()
+            saved_credential = credential_path.read_bytes()
+            key_before = inspect(state, identifier)
+            for mismatch in ('profile_id', 'credential_id', 'record_identity'):
+                changed_profile = json.loads(saved_profile)
+                if mismatch in ('profile_id', 'record_identity'):
+                    changed_profile['principal']['id'] = other_id
+                    profile_path.write_text(json.dumps(changed_profile))
+                if mismatch == 'credential_id':
+                    credential_path.write_text(other_token)
+                elif mismatch == 'record_identity':
+                    credential_path.unlink()
+                profile_before_repair = profile_path.read_bytes()
+                repair = run('init', 'repair', '--state-dir', str(state), '--discard', '--yes', '--json')
+                check(repair.returncode == 3, 'repair accepted conflicting identities')
+                check(profile_path.read_bytes() == profile_before_repair, 'refused repair mutated profile')
+                check(inspect(state, other_id) == other_before, 'conflicting repair changed manual key')
+                check(inspect(state, identifier) == key_before, 'conflicting repair changed onboarding key')
+                profile_path.write_bytes(saved_profile)
+                credential_path.write_bytes(saved_credential)
+                credential_path.chmod(0o600)
+            print('PASS: conflicting repair identities leave both keys and profile unchanged')
             revoked = run('keys', 'revoke', '--state-dir', str(state), identifier)
             check(revoked.returncode == 0, 'revoke failed')
             refused = run(*args(state, number))

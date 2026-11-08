@@ -57,10 +57,23 @@ func (o initOutput) emit(event string, fields map[string]any) error {
 func initCommand(args []string) error {
 	output := initOutput{}
 	for _, arg := range args {
-		if arg == "--json" || arg == "--json=true" {
+		if arg == "--" {
+			break
+		}
+		if !strings.HasPrefix(arg, "-") {
+			continue
+		}
+		name := strings.TrimPrefix(strings.TrimPrefix(arg, "-"), "-")
+		if name == "json" {
 			output.json = true
 		}
+		if value, ok := strings.CutPrefix(name, "json="); ok {
+			if enabled, err := strconv.ParseBool(value); err == nil {
+				output.json = enabled
+			}
+		}
 	}
+	requestedJSON := output.json
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	var err error
@@ -72,6 +85,7 @@ func initCommand(args []string) error {
 	if err == nil || errors.Is(err, flag.ErrHelp) {
 		return err
 	}
+	output.json = requestedJSON
 	var failure *initFailure
 	if !errors.As(err, &failure) {
 		failure = &initFailure{1, "io_error", "Check private local storage and retry; interrupted setup may require h2a init repair."}
@@ -205,6 +219,9 @@ func initStart(ctx context.Context, args []string, output *initOutput) error {
 	selected, err := selectProviders(*provider)
 	if err != nil || len(selected) != 1 {
 		return initFail(2, "invalid_provider", "Choose exactly one supported provider; see h2a init --help.")
+	}
+	if *provider != "ibm-bob" && *bob != "" {
+		return initFail(2, "invalid_extension", "Use --pi-bob-extension only with --provider ibm-bob.")
 	}
 	if api.CheckModel(*model, []string{*model}, selected, nil) != nil {
 		return initFail(2, "invalid_model", "Use an exact provider/model for the selected provider; wildcards are not allowed.")
@@ -402,11 +419,14 @@ func initRepair(ctx context.Context, args []string, output *initOutput) error {
 		return initFail(3, "state_unavailable", "Stop the gateway using this state before repair; do not remove lock files.")
 	}
 	defer owner.Close()
-	profile, _, err := files.Load()
+	profile, token, err := files.Load()
 	if err != nil {
 		return initFail(3, "repair_required", "Cannot establish the onboarding identity. Inspect the private profile and revoke only its verified key ID; do not guess or delete other keys.")
 	}
 	if profile != nil {
+		if err := initprofile.VerifyRepair(keys, *profile, token); err != nil {
+			return initFail(3, "repair_required", "Onboarding identities conflict. Inspect the private profile, credential, and key record before manually revoking a verified key; no setup was discarded.")
+		}
 		profile.Phase = initprofile.Discarding
 		if err := files.SaveProfile(*profile); err != nil {
 			return err

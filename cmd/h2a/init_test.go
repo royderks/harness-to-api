@@ -20,6 +20,10 @@ func TestInitHelpAndMachineErrors(t *testing.T) {
 		code string
 	}{
 		{[]string{"init", "--json"}, "input_required"},
+		{[]string{"init", "--bad", "-json"}, "invalid_arguments"},
+		{[]string{"init", "repair", "--bad", "-json=true"}, "invalid_arguments"},
+		{[]string{"init", "--json=false", "--bad", "-json=1"}, "invalid_arguments"},
+		{[]string{"init", "--provider", "codex", "--model", "codex/default", "--state-dir", "unused", "--port", "8787", "--no-probe", "--pi-bob-extension", "/tmp", "--json"}, "invalid_extension"},
 		{[]string{"init", "--unknown", "private-input", "--json"}, "invalid_arguments"},
 		{[]string{"init", "--provider", "codex", "--model", "codex/default", "--state-dir", "unused", "--port", "8787", "--probe", "--no-probe", "--json"}, "probe_choice"},
 		{[]string{"init", "--provider", "codex", "--model", "gemini/default", "--state-dir", "unused", "--port", "8787", "--no-probe", "--json"}, "invalid_model"},

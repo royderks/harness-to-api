@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -112,4 +113,74 @@ func TestResumeReportsReasons(t *testing.T) {
 			t.Fatalf("exhausted: %v", err)
 		}
 	})
+}
+
+func TestVerifyRepairIdentity(t *testing.T) {
+	for _, scenario := range []string{"matching", "missing credential", "revoked", "expired", "discarding", "other id", "wrong secret", "manual record"} {
+		t.Run(scenario, func(t *testing.T) {
+			s := auth.NewStore(t.TempDir())
+			p, token := testProfile(t)
+			if scenario == "expired" {
+				p.Principal.CreatedAt = time.Now().UTC().Add(-2 * time.Hour)
+				expiry := p.Principal.CreatedAt.Add(time.Hour)
+				p.Principal.Policy.ExpiresAt = &expiry
+			}
+			if err := s.InsertPrepared(token, p.Principal); err != nil {
+				t.Fatal(err)
+			}
+			wantMismatch := false
+			switch scenario {
+			case "missing credential":
+				token = ""
+			case "revoked":
+				if err := s.Revoke(p.Principal.ID); err != nil {
+					t.Fatal(err)
+				}
+			case "discarding":
+				p.Phase = Discarding
+			case "other id":
+				_, token = testProfile(t)
+				wantMismatch = true
+			case "wrong secret":
+				_, other := testProfile(t)
+				token = token[:37] + other[37:]
+				wantMismatch = true
+			case "manual record":
+				_, manual, err := s.Create("manual", []string{"codex/*"}, auth.Policy{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				p.Principal.ID = manual.ID
+				token = ""
+				wantMismatch = true
+			}
+			before, err := s.List()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = VerifyRepair(s, p, token)
+			if wantMismatch && !errors.Is(err, ErrMismatch) || !wantMismatch && err != nil {
+				t.Fatalf("unexpected repair validation: %v", err)
+			}
+			after, err := s.List()
+			if err != nil || !reflect.DeepEqual(before, after) {
+				t.Fatal("validation changed keys")
+			}
+		})
+	}
+}
+
+func TestLoadRejectsConflictingCredentialIdentity(t *testing.T) {
+	s, _ := newTestStore(t)
+	p, _ := testProfile(t)
+	_, other := testProfile(t)
+	if err := s.SaveProfile(p); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveCredential(other); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.Load(); !errors.Is(err, ErrRepair) {
+		t.Fatalf("conflicting identity: %v", err)
+	}
 }

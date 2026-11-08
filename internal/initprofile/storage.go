@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 const maxProfileBytes = 64 << 10
@@ -58,7 +59,7 @@ func (s *Store) Load() (*Profile, string, error) {
 		return &p, "", nil
 	}
 	token := string(credential)
-	if !credentialPattern.MatchString(token) {
+	if !credentialPattern.MatchString(token) || !strings.HasPrefix(token, "h2a_"+p.Principal.ID+"_") {
 		return nil, "", ErrRepair
 	}
 	return &p, token, nil

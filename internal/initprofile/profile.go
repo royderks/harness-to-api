@@ -101,3 +101,28 @@ func Resume(store *auth.Store, p Profile, token string) (auth.Inspection, error)
 	}
 	return inspection, nil
 }
+
+// VerifyRepair rejects conflicting identities while permitting cleanup after
+// revocation, expiry, exhaustion, or interrupted credential removal.
+func VerifyRepair(store *auth.Store, p Profile, token string) error {
+	if p.Validate() != nil || (token != "" && (!credentialPattern.MatchString(token) || !strings.HasPrefix(token, "h2a_"+p.Principal.ID+"_"))) {
+		return ErrMismatch
+	}
+	inspection, err := store.Inspect(p.Principal.ID)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil || !reflect.DeepEqual(inspection.Principal, p.Principal) {
+		return ErrMismatch
+	}
+	if token != "" {
+		principal, err := store.Authenticate(token)
+		if errors.Is(err, auth.ErrExpiredKey) {
+			return nil
+		}
+		if err != nil || !reflect.DeepEqual(principal, p.Principal) {
+			return ErrMismatch
+		}
+	}
+	return nil
+}
