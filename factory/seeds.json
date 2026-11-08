@@ -225,7 +225,9 @@
       "title": "Run one bounded issue through the factory handoff",
       "intent": "Evaluate the source-to-issue-to-PR workflow before adding a scheduler or autonomous launcher.",
       "sources": [
-        "GENESIS.md#g6-preserve-intent-across-agent-sessions"
+        "GENESIS.md#g6-preserve-intent-across-agent-sessions",
+        "docs/factory.md",
+        "docs/factory/roles.md"
       ],
       "scope": [
         "docs/factory/",

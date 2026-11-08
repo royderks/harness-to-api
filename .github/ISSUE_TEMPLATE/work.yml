@@ -1,0 +1,50 @@
+name: Factory work
+description: Propose bounded work linked to product intent or observed evidence.
+title: ""
+labels: ["factory:triage", "priority:p2"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include secrets, private prompts, or raw diagnostics. Redact evidence before linking it. To support an existing issue, add a thumbs-up to its opening description instead of a +1 comment. Votes do not approve scope or start workers.
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Intent or evidence
+      description: Link the relevant GENESIS intent, human request, or observed defect and its evidence.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome and scope
+      description: Describe the desired outcome, boundaries, and paths likely to change.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: State observable conditions for accepting the work.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: Describe the checks and evidence needed to prove the outcome, including any known gaps.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and prerequisites
+      description: Link dependencies and state what acceptance or access is needed. Write none if there are none.
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk and decisions
+      description: Identify risks, irreversible actions, and unresolved product decisions. Write none if there are none.
+    validations:
+      required: true
