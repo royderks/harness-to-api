@@ -1,4 +1,5 @@
 mod args;
+mod init;
 mod keys;
 mod probe;
 use crate::{api, auth, harness};
@@ -12,12 +13,15 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 
-const HELP: &str = "h2a - Authenticated OpenAI-compatible harness gateway.\n\nCommands: doctor, keys, probe, serve, share, version, factory\nUse h2a COMMAND --help for flags.";
+const HELP: &str = "h2a — Your coding harness, as an authenticated OpenAI-compatible API.\n\nUsage:\n  h2a init [--provider codex --model codex/default --state-dir PATH --port 8787 --no-probe --json]\n  h2a init repair --state-dir PATH --discard --yes\n  h2a doctor\n  h2a keys create|list|revoke|inspect|explain [flags]\n  h2a probe --model provider/model [--base-url URL]\n  h2a serve [--provider codex[,gemini,...]|all] [--port 8787]\n  h2a share [--via tailscale|funnel|cloudflare] [--port 8787]\n  h2a factory validate|plan|seed|adopt|recover\n  h2a version\n\nGet started:\n  1. Install and sign in to an official harness CLI (for Codex: codex login).\n  2. h2a init\n  3. Use the printed client example in another terminal; Ctrl+C stops the server.\n\nUse h2a <command> --help for flags. Init stores a protected client credential;\nkeys create prints a new key once to stdout. Keep both secret.\nSet HARNESS_API_STATE_DIR to choose the private local state directory.";
 
 pub async fn run(mut args: Vec<String>) -> i32 {
     if args.first().is_some_and(|s| s == "help") && args.len() > 1 {
         args.remove(0);
         args.push("--help".into());
+    }
+    if args.first().is_some_and(|s| s == "init") {
+        return init::run(&args[1..]).await;
     }
     let result = dispatch(&args).await;
     match result {
