@@ -1,0 +1,9 @@
+{"version": 2, "width": 100, "height": 30, "timestamp": 1794265583, "title": "harness-to-api: offline API and key lifecycle", "env": {"TERM": "xterm-256color"}}
+[0.0, "o", "$ ./demo/run.sh --fixture\r\n"]
+[0.049, "o", "\r\nOFFLINE FIXTURE — no provider call\r\nModel: codex/default\r\n"]
+[0.65, "o", "Created an isolated, model-scoped key (secret hidden).\r\n"]
+[0.659, "o", "Gateway ready on loopback.\r\n\r\n"]
+[0.659, "o", "No key → HTTP 401\r\n\r\nStreaming answer:\r\n"]
+[0.68, "o", "A gateway gives a client one controlled doorway to a coding harness."]
+[0.68, "o", "\r\n"]
+[0.691, "o", "\r\nRevoked key → HTTP 401\r\nDone. Gateway and temporary key store are being removed.\r\n"]

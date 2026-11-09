@@ -1,0 +1,14 @@
+$ ./demo/run.sh --fixture
+
+OFFLINE FIXTURE — no provider call
+Model: codex/default
+Created an isolated, model-scoped key (secret hidden).
+Gateway ready on loopback.
+
+No key → HTTP 401
+
+Streaming answer:
+A gateway gives a client one controlled doorway to a coding harness.
+
+Revoked key → HTTP 401
+Done. Gateway and temporary key store are being removed.

@@ -100,7 +100,9 @@
       "title": "Demonstrate bounded h2a access from OpenShell",
       "intent": "Show a sandbox using h2a as its provider and receiving explicit policy denials. Earlier OpenShell proof covered one successful request before bounded keys were added.",
       "sources": [
-        "GENESIS.md#g2-start-from-a-cli-and-work-from-sandboxes"
+        "GENESIS.md#g2-start-from-a-cli-and-work-from-sandboxes",
+        "docs/openshell-live.md",
+        "docs/policies.md"
       ],
       "scope": [
         "examples/openshell/",
@@ -132,7 +134,9 @@
       "title": "Verify native release and Windows policy behavior",
       "intent": "Convert cross-compilation evidence into native execution evidence before making platform support claims.",
       "sources": [
-        "GENESIS.md#g4-keep-the-project-simple-and-demonstrable"
+        "GENESIS.md#g4-keep-the-project-simple-and-demonstrable",
+        "docs/verification.md",
+        "docs/architecture.md#operational-limits"
       ],
       "scope": [
         ".github/workflows/",
@@ -164,7 +168,9 @@
       "title": "Resolve the remaining live provider verification gaps",
       "intent": "Keep adapter claims tied to observed account access. Gemini, Claude, OpenCode and IBM Bob currently have protocol evidence but no successful live-account inference in this checkout.",
       "sources": [
-        "GENESIS.md#g1-make-installed-coding-harnesses-usable-through-an-api"
+        "GENESIS.md#g1-make-installed-coding-harnesses-usable-through-an-api",
+        "docs/verification.md#provider-checks",
+        "docs/ibm-bob.md"
       ],
       "scope": [
         "docs/verification.md",
@@ -196,7 +202,9 @@
       "title": "Validate the documented Docker runtime recipe",
       "intent": "Verify the container recipe on an isolated Docker host.",
       "sources": [
-        "GENESIS.md"
+        "docs/docker.md",
+        "docs/deployment.md",
+        "docs/verification.md#deployment-limits"
       ],
       "scope": [
         "Dockerfile",
@@ -258,7 +266,8 @@
       "title": "Prepare the release installation channel",
       "intent": "Distribute harness-to-api as the h2a executable with verifiable native archives.",
       "sources": [
-        "GENESIS.md#g5-make-installation-straightforward"
+        "GENESIS.md#g5-make-installation-straightforward",
+        "docs/distribution.md"
       ],
       "scope": [
         "scripts/release.sh",

@@ -1,0 +1,38 @@
+name: CI
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    timeout-minutes: 20
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install stable --profile minimal --component clippy,rustfmt
+      - run: rustup default stable
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo build --locked --bin h2a --example harness-fixture
+      - name: Native tests with all harness fixtures enabled
+        run: |
+          suffix=""
+          if [ "$RUNNER_OS" = Windows ]; then suffix=".exe"; fi
+          H2A_HARNESS_FIXTURE="$PWD/target/debug/examples/harness-fixture$suffix" cargo test --locked --all-targets
+      - name: Offline CLI and HTTP lifecycles
+        if: runner.os != 'Windows'
+        env:
+          H2A_BIN: ${{ github.workspace }}/target/debug/h2a
+          H2A_FIXTURE: ${{ github.workspace }}/target/debug/examples/harness-fixture
+        run: |
+          ./demo/run.sh --fixture
+          python3 scripts/check-policies.py
+          python3 scripts/check-init.py
