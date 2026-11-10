@@ -13,6 +13,8 @@ test: build
 check: test
 	$(CARGO) fmt --all -- --check
 	$(CARGO) clippy --locked --all-targets -- -D warnings
+	python3 scripts/check_readme.py --binary ./bin/h2a
+	python3 -m unittest discover -s scripts/ci_tests -v
 	./bin/h2a factory validate
 	H2A_BIN="$(CURDIR)/bin/h2a" python3 -m unittest discover -s scripts/tests -v
 

@@ -110,7 +110,7 @@ target triple; its toolchain/linker must exist. Native verification rejects a
 runner with the wrong OS or architecture.
 
 The release workflow tests all six targets on matching native runners, extracts
-each final archive, checks its version/help, and exercises an offline authenticated
+each final archive, checks its version/help and README command coverage, and exercises an offline authenticated
 HTTP request, quota denial, durable count and revocation. No provider account is
 used. PRs touching release files run the same checks without publishing. An approved
 version tag creates a **draft** release only after all targets pass. Inspect the

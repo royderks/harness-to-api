@@ -1,5 +1,11 @@
 name: Factory validation
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: factory-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -9,11 +15,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           persist-credentials: false
+      - run: python3 scripts/check_readme.py
+      - id: paths
+        run: python3 scripts/ci_changes.py
+      - name: Documentation-only change
+        if: steps.paths.outputs.build == 'false'
+        run: echo 'Documentation checked; factory build not required.'
       - run: rustup toolchain install stable --profile minimal
+        if: steps.paths.outputs.build == 'true'
       - run: rustup default stable
+        if: steps.paths.outputs.build == 'true'
       - run: cargo build --locked --bin h2a
+        if: steps.paths.outputs.build == 'true'
       - run: target/debug/h2a factory validate
+        if: steps.paths.outputs.build == 'true'
       - run: python3 -m unittest discover -s scripts/tests -v
+        if: steps.paths.outputs.build == 'true'
         env:
           H2A_BIN: ${{ github.workspace }}/target/debug/h2a
