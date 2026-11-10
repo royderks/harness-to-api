@@ -25,6 +25,8 @@ The demo cleans up its server and key store. Python uses only its standard libra
 
 ## Start locally
 
+Download a native archive and checksum from [GitHub Releases](https://github.com/royderks/harness-to-api/releases), then follow the [binary installation instructions](docs/distribution.md). Downloaded binaries need no Rust toolchain. Private-repository downloads require repository access.
+
 For local development, build from this checkout with Rust 1.89+:
 
 ```sh

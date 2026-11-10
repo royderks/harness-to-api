@@ -17,13 +17,24 @@ case "$platform" in windows_*) executable=h2a.exe;; esac
 H2A_VERSION="$version" cargo build --locked --release --target "$target" --bin h2a
 name="h2a_${version}_${platform}"
 folder="dist/$name"
+# Refuse stale packaging directories so old files cannot leak into a new archive.
+if [ -e "$folder" ]; then
+  echo "Archive staging directory already exists: $folder; remove it before rebuilding" >&2
+  exit 1
+fi
 mkdir -p "$folder"
 cp "target/$target/release/$executable" "$folder/"
 cp LICENSE README.md CONTRIBUTING.md "$folder/"
 cp -R docs examples "$folder/"
-mkdir -p "$folder/demo" "$folder/scripts"
+mkdir -p "$folder/demo"
 cp demo/*.py demo/*.sh "$folder/demo/"
-cp scripts/record-demo.py "$folder/scripts/"
+{
+  printf 'version: %s\ntarget: %s\nsource_commit: %s\n' "$version" "$target" "$(git rev-parse HEAD)"
+  rustc -vV
+  cargo --version
+  printf 'signature: unsigned\n'
+} > "dist/build_${version}_${platform}.txt"
+cp "dist/build_${version}_${platform}.txt" "$folder/BUILD.txt"
 tar -czf "dist/$name.tar.gz" -C "$folder" .
 cd dist
 if command -v sha256sum >/dev/null 2>&1; then
