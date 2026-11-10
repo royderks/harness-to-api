@@ -52,6 +52,33 @@ curl http://127.0.0.1:8787/v1/chat/completions \
   -d '{"model":"codex/default","messages":[{"role":"user","content":"Explain a reverse proxy in one sentence."}],"stream":true}'
 ```
 
+## Commands
+
+<!-- commands:start -->
+| Command | Purpose |
+| --- | --- |
+| `h2a init` | Set up bounded local access and run the gateway in the foreground. |
+| `h2a init repair` | Discard an interrupted onboarding setup after identity checks and explicit confirmation. |
+| `h2a doctor` | Check installed harness and tunnel binaries; does not verify login. |
+| `h2a serve` | Start the API with existing keys and selected harnesses. |
+| `h2a probe` | Make a real completion request to verify access; consumes quota. |
+| `h2a share` | Print tunnel setup instructions; does not change networking. |
+| `h2a keys create` | Create a scoped key with optional expiry and limits; prints its secret once. |
+| `h2a keys list` | List stored key metadata without secrets. |
+| `h2a keys inspect` | Show a key's policy and durable usage. |
+| `h2a keys explain` | Check whether a model would be allowed by a key and supplied configuration. |
+| `h2a keys revoke` | Revoke a key and cancel its active managed requests. |
+| `h2a factory validate` | Validate the repository's issue seed manifest locally. |
+| `h2a factory plan` | Compare seeds with GitHub without publishing changes. |
+| `h2a factory seed` | Publish seed labels/issues when explicitly requested with `--apply`. |
+| `h2a factory adopt` | Explicitly bind a seed to an existing GitHub issue in the local journal. |
+| `h2a factory recover` | Reconcile an uncertain issue publication before retrying. |
+| `h2a version` | Print the gateway version; also available as `h2a --version`. |
+| `h2a help` | Show usage; also available as `h2a --help` or `h2a -h`. |
+<!-- commands:end -->
+
+For command flags, use commands such as `h2a help serve` or `h2a keys create --help`. See the [CLI guide](docs/cli.md) and [factory guide](docs/factory.md) for full usage, including factory arguments.
+
 ## Supported harnesses
 
 Install and sign in to the harness you want to use. Select it with `--provider` and use its model prefix in API requests.

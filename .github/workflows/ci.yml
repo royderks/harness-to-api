@@ -1,34 +1,80 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.paths.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: python3 -m unittest discover -s scripts/ci_tests -v
+      - run: python3 scripts/check_readme.py
+      - id: paths
+        run: python3 scripts/ci_changes.py
   test:
+    name: test (${{ matrix.os }})
+    needs: changes
+    if: always()
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     timeout-minutes: 20
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ needs.changes.outputs.build == 'true' && matrix.os || 'ubuntu-latest' }}
     defaults:
       run:
         shell: bash
     steps:
+      - name: Require successful change detection and documentation checks
+        env:
+          RESULT: ${{ needs.changes.result }}
+          BUILD: ${{ needs.changes.outputs.build }}
+        run: |
+          test "$RESULT" = success
+          case "$BUILD" in true|false) ;; *) exit 1;; esac
+      - name: Documentation-only change
+        if: needs.changes.outputs.build == 'false'
+        run: echo 'Documentation checked; native build not required.'
       - uses: actions/checkout@v4
+        if: needs.changes.outputs.build == 'true'
         with:
           persist-credentials: false
       - run: rustup toolchain install stable --profile minimal --component clippy,rustfmt
+        if: needs.changes.outputs.build == 'true'
       - run: rustup default stable
+        if: needs.changes.outputs.build == 'true'
       - run: cargo fmt --all -- --check
+        if: needs.changes.outputs.build == 'true'
       - run: cargo clippy --locked --all-targets -- -D warnings
+        if: needs.changes.outputs.build == 'true'
       - run: cargo build --locked --bin h2a --example harness-fixture
+        if: needs.changes.outputs.build == 'true'
       - name: Native tests with all harness fixtures enabled
+        if: needs.changes.outputs.build == 'true'
         run: |
           suffix=""
           if [ "$RUNNER_OS" = Windows ]; then suffix=".exe"; fi
           H2A_HARNESS_FIXTURE="$PWD/target/debug/examples/harness-fixture$suffix" cargo test --locked --all-targets
+      - name: Verify command reference against the built CLI
+        if: needs.changes.outputs.build == 'true'
+        run: |
+          suffix=""
+          if [ "$RUNNER_OS" = Windows ]; then suffix=".exe"; fi
+          python scripts/check_readme.py --binary "target/debug/h2a$suffix"
       - name: Offline CLI and HTTP lifecycles
-        if: runner.os != 'Windows'
+        if: needs.changes.outputs.build == 'true' && runner.os != 'Windows'
         env:
           H2A_BIN: ${{ github.workspace }}/target/debug/h2a
           H2A_FIXTURE: ${{ github.workspace }}/target/debug/examples/harness-fixture
