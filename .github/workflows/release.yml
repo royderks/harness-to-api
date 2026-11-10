@@ -2,8 +2,16 @@ name: Release
 on:
   push:
     tags: ['v*']
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'scripts/release.sh'
+      - 'scripts/check-release.py'
+      - 'docs/distribution.md'
 permissions:
   contents: read
+env:
+  RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.0' }}
 jobs:
   build:
     strategy:
@@ -27,6 +35,9 @@ jobs:
           persist-credentials: false
       - run: rustup toolchain install stable --profile minimal
       - run: rustup default stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
       - run: cargo build --locked --example harness-fixture
       - name: Test on target platform
         run: |
@@ -35,7 +46,13 @@ jobs:
           H2A_HARNESS_FIXTURE="$PWD/target/debug/examples/harness-fixture$suffix" cargo test --locked --all-targets
       - run: scripts/release.sh "$RELEASE_VERSION" "$RELEASE_TARGET"
         env:
-          RELEASE_VERSION: ${{ github.ref_name }}
+          RELEASE_TARGET: ${{ matrix.target }}
+      - name: Verify and execute the extracted release archive
+        run: |
+          suffix=""
+          if [ "$RUNNER_OS" = Windows ]; then suffix=".exe"; fi
+          python scripts/check-release.py --version "$RELEASE_VERSION" --target "$RELEASE_TARGET" --fixture "$PWD/target/debug/examples/harness-fixture$suffix"
+        env:
           RELEASE_TARGET: ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
@@ -43,8 +60,11 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/checksums_*.txt
+            dist/build_*.txt
+            dist/verification_*.json
   release:
     needs: build
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -54,7 +74,6 @@ jobs:
           pattern: h2a-*
           merge-multiple: true
           path: dist
-      - run: gh release create "$RELEASE_VERSION" dist/*.tar.gz dist/checksums_*.txt --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+      - run: gh release create "$RELEASE_VERSION" dist/*.tar.gz dist/checksums_*.txt dist/build_*.txt dist/verification_*.json --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "harness-to-api $RELEASE_VERSION" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ github.ref_name }}
