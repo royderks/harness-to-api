@@ -13,7 +13,7 @@ trap 'rm -rf -- "$snapshot"' EXIT HUP INT TERM
 # Build and package only committed inputs, excluding ignored files and local extras.
 git archive --output="$snapshot/source.tar" "$source_commit"
 tar -xf "$snapshot/source.tar" -C "$snapshot"
-target=${2:-$(rustc -vV | sed -n 's/^host: //p')}
+target=${2:-$(cd "$snapshot" && rustc -vV | sed -n 's/^host: //p')}
 case "$target" in
   aarch64-apple-darwin) platform=darwin_arm64;;
   x86_64-apple-darwin) platform=darwin_amd64;;
@@ -32,7 +32,10 @@ if [ -e "$folder" ]; then
   echo "Archive staging directory already exists: $folder; remove it before rebuilding" >&2
   exit 1
 fi
-H2A_VERSION="$version" cargo build --manifest-path "$snapshot/Cargo.toml" --target-dir "$repo/target" --locked --release --target "$target" --bin h2a
+(
+  cd "$snapshot"
+  H2A_VERSION="$version" cargo build --target-dir "$repo/target" --locked --release --target "$target" --bin h2a
+)
 mkdir -p "$folder"
 cp "target/$target/release/$executable" "$folder/"
 cp "$snapshot/LICENSE" "$snapshot/README.md" "$snapshot/CONTRIBUTING.md" "$folder/"
@@ -41,8 +44,8 @@ mkdir -p "$folder/demo"
 cp "$snapshot"/demo/*.py "$snapshot"/demo/*.sh "$folder/demo/"
 {
   printf 'version: %s\ntarget: %s\nsource_commit: %s\n' "$version" "$target" "$source_commit"
-  rustc -vV
-  cargo --version
+  (cd "$snapshot" && rustc -vV && cargo --version)
+  printf 'build_environment: ambient toolchain, environment and user Cargo configuration; not hermetic\n'
   printf 'signature: unsigned\n'
 } > "dist/build_${version}_${platform}.txt"
 cp "dist/build_${version}_${platform}.txt" "$folder/BUILD.txt"

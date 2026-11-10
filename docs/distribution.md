@@ -96,9 +96,14 @@ python3 scripts/check-release.py --version v0.1.0 \
 ```
 
 The script writes an archive, SHA-256 checksum and build information to `dist/`.
-Commit source and documentation changes first: tracked edits are rejected. Builds
-and packaged files come from an isolated snapshot of that commit; untracked and
-ignored local files are excluded.
+Commit source and documentation changes first: tracked edits are rejected. Source
+and packaged files come from a snapshot of that commit; untracked and ignored
+checkout files are excluded. Cargo runs from that snapshot, so checkout-local
+Cargo configuration is not discovered. This is not a hermetic or bit-for-bit
+reproducible build: the installed toolchain, environment variables, user Cargo
+configuration and system libraries remain trusted build inputs. Published builds
+use fresh hosted runners. Build metadata identifies source and compiler, not every
+ambient machine setting.
 It refuses to reuse an existing staging directory. Remove only that task's staging
 directory before an intentional rebuild. An optional second argument selects a
 target triple; its toolchain/linker must exist. Native verification rejects a
