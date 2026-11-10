@@ -10,6 +10,9 @@ The project is **harness-to-api**; the executable is `h2a`.
 
 ## Watch it work
 
+[Runnable examples](examples/README.md): switch between harnesses, run LangGraph or
+the OpenAI Agents SDK, and connect Docker, OpenShell, E2B, or Modal clients.
+
 [Replay the offline demo](docs/assets/fixture-demo.html) · [terminal recording](docs/assets/fixture-demo.cast) · [transcript](docs/assets/fixture-demo.txt). It shows authentication, streaming and revocation with a canned harness response; no provider account is used. Download the HTML file to play it locally.
 
 Run a demo with temporary scoped keys, streamed responses, and revocation:
