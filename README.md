@@ -72,7 +72,7 @@ h2a keys create --name mixed-client --models 'codex/*,gemini/*'
 h2a serve --provider codex,gemini
 ```
 
-`--provider all` enables all six adapters and requires their CLIs and extensions to be installed. `/default` uses the harness default; select a specific model with its prefixed ID. Run `agy models` for available Antigravity model slugs. `/v1/models` lists configured aliases and key scopes; it does not discover account entitlements.
+`--provider all` enables all six adapters and requires their CLIs and extensions to be installed. `/default` uses the harness default, except `ibm-bob/default`, which selects `premium`. Select a specific model with its prefixed ID. Run `agy models` for available Antigravity model slugs. `/v1/models` lists configured aliases and key scopes; it does not discover account entitlements.
 
 Codex skips user configuration but retains account login. Its CLI must support `--ignore-user-config`, `--ignore-rules`, and `--ephemeral` (validated against 0.165.0). The linked guides cover other harness-specific requirements and verification limits.
 
