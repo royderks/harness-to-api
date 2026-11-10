@@ -96,6 +96,9 @@ python3 scripts/check-release.py --version v0.1.0 \
 ```
 
 The script writes an archive, SHA-256 checksum and build information to `dist/`.
+Commit source and documentation changes first: tracked edits are rejected. Builds
+and packaged files come from an isolated snapshot of that commit; untracked and
+ignored local files are excluded.
 It refuses to reuse an existing staging directory. Remove only that task's staging
 directory before an intentional rebuild. An optional second argument selects a
 target triple; its toolchain/linker must exist. Native verification rejects a
