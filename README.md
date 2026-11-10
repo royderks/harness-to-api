@@ -2,30 +2,15 @@
 
 **Your coding harness. One OpenAI-compatible endpoint.**
 
-Run Codex, Antigravity, Gemini CLI, Claude Code, OpenCode, or IBM Bob through Pi behind an API key. Point an OpenAI client at it—from your laptop, a container, or a remote sandbox.
+Put your coding harness behind an API key. Point an OpenAI client at it—from your laptop, a container, or a remote sandbox.
 
-A single native Rust binary. End users do **not** need Rust, Node, or Python to run the gateway. Install and authenticate each harness CLI separately. IBM Bob uses the community `pi-bob` extension for Pi.
+A single native Rust binary. End users do **not** need Rust, Node, or Python to run the gateway. Install and authenticate each harness CLI separately.
 
 The project is **harness-to-api**; the executable is `h2a`.
 
-## Watch it work
+## Getting started
 
-[Replay the offline demo](docs/assets/fixture-demo.html) · [terminal recording](docs/assets/fixture-demo.cast) · [transcript](docs/assets/fixture-demo.txt). It shows authentication, streaming and revocation with a canned harness response; no provider account is used. Download the HTML file to play it locally.
-
-Run a demo with temporary scoped keys, streamed responses, and revocation:
-
-```sh
-./demo/run.sh                           # real Codex; needs Rust, Python 3, and Codex login
-./demo/run.sh --provider antigravity     # real Antigravity; needs agy login
-H2A_BIN=./bin/h2a ./demo/run.sh           # use a prebuilt h2a; no Rust toolchain required
-./demo/run.sh --fixture                 # explicitly offline, no provider call
-```
-
-The demo cleans up its server and key store. Python uses only its standard library. See [demo instructions](docs/demo.md) for the OpenShell recipe and recording commands.
-
-## Start locally
-
-Download a native archive and checksum from [GitHub Releases](https://github.com/royderks/harness-to-api/releases), then follow the [binary installation instructions](docs/distribution.md). Downloaded binaries need no Rust toolchain. Private-repository downloads require repository access.
+Download a native archive and checksum from [GitHub Releases](https://github.com/royderks/harness-to-api/releases), then follow the [binary installation instructions](docs/distribution.md). Downloaded binaries need no Rust toolchain.
 
 For local development, build from this checkout with Rust 1.89+:
 
@@ -67,35 +52,31 @@ curl http://127.0.0.1:8787/v1/chat/completions \
   -d '{"model":"codex/default","messages":[{"role":"user","content":"Explain a reverse proxy in one sentence."}],"stream":true}'
 ```
 
-`codex/default` uses the CLI's default model. Select a specific available model with `codex/<model-id>`. Codex user configuration is deliberately skipped; account login is retained. The Codex adapter requires a CLI supporting `--ignore-user-config`, `--ignore-rules`, and `--ephemeral` (validated against 0.165.0).
+## Supported harnesses
 
-## Antigravity
+Install and sign in to the harness you want to use. Select it with `--provider` and use its model prefix in API requests.
 
-Install the [official Antigravity CLI](https://antigravity.google/docs/cli/tutorial/) and run `agy` interactively once to sign in. Then:
+| Harness | Provider | Example model | Setup |
+| --- | --- | --- | --- |
+| Codex | `codex` | `codex/default` | [Getting started](#getting-started) |
+| Antigravity | `antigravity` | `antigravity/default` | [CLI installation and login](https://antigravity.google/docs/cli/tutorial/) |
+| Gemini CLI | `gemini` | `gemini/default` | [Setup guide](docs/gemini.md) |
+| Claude Code | `claude` | `claude/default` | [Setup guide](docs/claude.md) |
+| OpenCode | `opencode` | `opencode/<provider>/<model-id>` | [Setup guide](docs/opencode.md) |
+| IBM Bob through Pi | `ibm-bob` | `ibm-bob/premium` | [Setup guide](docs/ibm-bob.md) |
 
-```sh
-./bin/h2a keys create --name antigravity-client --models 'antigravity/*'
-./bin/h2a serve --provider antigravity
-```
-
-Use `antigravity/default` or `antigravity/<model-slug>`. Run `agy models` for your available models. `--provider codex,antigravity` enables both in one server. `--provider all` enables all six adapters and requires all CLIs plus the Bob extension. Keys can allow both using `--models 'codex/*,antigravity/*'`.
-
-The gateway invokes supported harness CLIs; the IBM integration uses the explicitly installed community Pi extension. It does not extract OAuth tokens or call private provider endpoints. Harness login, subscription access, model eligibility, and provider limits remain controlled by each provider. An h2a key protects this gateway; it is not an OpenAI, Google, or IBM provider key.
-
-## IBM Bob through Pi
-
-IBM Bob is available as `--provider ibm-bob`, with models such as `ibm-bob/premium` or `ibm-bob/openai/gpt-oss-20b`. It uses [pi-bob](https://pi.dev/packages/pi-bob), a community Pi provider extension, not IBM's official Bob CLI. See [installation, login, and serving instructions](docs/ibm-bob.md). The adapter is tested against the Pi protocol; live IBM account inference has not been verified here.
-
-## Gemini CLI, Claude Code, and OpenCode
-
-See [Gemini CLI setup](docs/gemini.md), [Claude Code setup](docs/claude.md), and [OpenCode setup](docs/opencode.md) for installation, login, supported versions, execution restrictions, and compatibility notes.
+Enable multiple harnesses in one server and scope a key to them:
 
 ```sh
 h2a keys create --name mixed-client --models 'codex/*,gemini/*'
 h2a serve --provider codex,gemini
 ```
 
-Use `gemini/default`, `claude/default`, or an explicit model under that harness prefix. OpenCode model IDs include its upstream provider: `opencode/<provider>/<model-id>`. `/v1/models` lists the enabled aliases and your key's exact scopes; it does not discover account entitlements.
+`--provider all` enables all six adapters and requires their CLIs and extensions to be installed. `/default` uses the harness default; select a specific model with its prefixed ID. Run `agy models` for available Antigravity model slugs. `/v1/models` lists configured aliases and key scopes; it does not discover account entitlements.
+
+Codex skips user configuration but retains account login. Its CLI must support `--ignore-user-config`, `--ignore-rules`, and `--ephemeral` (validated against 0.165.0). The linked guides cover other harness-specific requirements and verification limits.
+
+h2a invokes installed CLIs and extensions; it does not extract OAuth tokens or call private provider endpoints. Each provider controls login, subscription access, model eligibility, and limits. Gateway keys are separate from provider credentials.
 
 ## Use an OpenAI client
 
