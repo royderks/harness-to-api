@@ -10,26 +10,31 @@ The project is **harness-to-api**; the executable is `h2a`.
 
 ## Getting started
 
-Download a native archive and checksum from [GitHub Releases](https://github.com/royderks/harness-to-api/releases), then follow the [binary installation instructions](docs/distribution.md). Downloaded binaries need no Rust toolchain.
-
-For local development, build from this checkout with Rust 1.89+:
+Install the [Codex CLI](https://learn.chatgpt.com/docs/cli) and sign in with `codex login`. On macOS or Linux, download and verify the native binary, then install it on your PATH:
 
 ```sh
-cargo build --locked --bin h2a --example harness-fixture
-mkdir -p bin && cp target/debug/h2a bin/h2a
+platform="$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+release="https://github.com/royderks/harness-to-api/releases/download/v0.1.0"
+curl -fsSLO "$release/h2a_v0.1.0_${platform}.tar.gz" &&
+curl -fsSLO "$release/checksums_v0.1.0_${platform}.txt" &&
+(if command -v sha256sum >/dev/null 2>&1; then
+  sha256sum -c "checksums_v0.1.0_${platform}.txt"
+else
+  shasum -a 256 -c "checksums_v0.1.0_${platform}.txt"
+fi) &&
+mkdir -p h2a-v0.1.0 "$HOME/.local/bin" &&
+tar -xzf "h2a_v0.1.0_${platform}.tar.gz" -C h2a-v0.1.0 ./h2a &&
+install -m 755 h2a-v0.1.0/h2a "$HOME/.local/bin/h2a" &&
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Install the [official Codex CLI](https://learn.chatgpt.com/docs/cli), then sign in:
+Then start the gateway:
 
 ```sh
-codex login
+h2a init --provider codex
 ```
 
-Start the foreground setup flow:
-
-```sh
-./bin/h2a init
-```
+No Rust toolchain is needed. See [binary installation](docs/distribution.md) for Windows PowerShell, platform requirements, unsigned-app notices, and making the PATH change permanent.
 
 It shows the provider, endpoint, state location, and bounded key policy before setup. A live probe is a separate opt-in; setup alone does not make an inference request. The endpoint is unverified until a probe succeeds. Keep the process running and stop it with Ctrl+C. See [onboarding](docs/onboarding.md) for a client example, automation, and recovery.
 
@@ -38,7 +43,7 @@ The lower-level `keys create` and `serve` commands remain available; see the [CL
 Give a sandbox bounded access with an expiring key:
 
 ```sh
-export OPENAI_API_KEY="$(./bin/h2a keys create --name sandbox \
+export OPENAI_API_KEY="$(h2a keys create --name sandbox \
   --models 'codex/*' --ttl 1h --request-timeout 90s \
   --max-requests 20 --rate-limit 5/min --max-concurrent 1)"
 ```
@@ -177,12 +182,19 @@ Keys and client environment secrets are excluded from the child environment. Off
 
 ## Develop and release
 
+For local development, build from this checkout with Rust 1.89+:
+
 ```sh
 cargo build --locked --bin h2a --example harness-fixture
+mkdir -p bin && cp target/debug/h2a bin/h2a
+```
+
+Run the offline checks, then optionally probe your running gateway:
+
+```sh
 H2A_HARNESS_FIXTURE="$PWD/target/debug/examples/harness-fixture" cargo test --locked --all-targets
 cargo clippy --locked --all-targets -- -D warnings
-mkdir -p bin && cp target/debug/h2a bin/h2a
-h2a probe --base-url http://127.0.0.1:8787/v1 --model codex/default
+./bin/h2a probe --base-url http://127.0.0.1:8787/v1 --model codex/default
 ```
 
 The probe makes one model call using your existing Codex login. Normal tests use subprocess protocol fixtures and never require credentials.
