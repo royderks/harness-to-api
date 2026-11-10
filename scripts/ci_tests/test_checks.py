@@ -87,6 +87,15 @@ class CommandReference(unittest.TestCase):
             with self.assertRaises(ValueError):
                 readme.check_commands(table, help_text)
 
+    def test_new_command_tokens_cannot_disappear(self):
+        for command in ['repair2', 'repair_state', 'repair.v2']:
+            help_text = self.HELP.replace('  h2a help', f'  h2a init {command}\n  h2a help')
+            with self.assertRaises(ValueError):
+                readme.check_commands(self.TABLE, help_text)
+        table = self.TABLE.replace('<!-- commands:end -->', '| `h2a init repair2` | Repair |\n<!-- commands:end -->')
+        help_text = self.HELP.replace('  h2a help', '  h2a init repair2\n  h2a help')
+        self.assertEqual(readme.check_commands(table, help_text), 6)
+
     def test_broken_local_link_and_anchor_fail(self):
         with tempfile.TemporaryDirectory() as directory:
             for markdown in ['[missing](missing.md)', '[missing](#absent)']:

@@ -20,8 +20,10 @@ def help_commands(help_text):
             raise ValueError('Unrecognized CLI usage line')
         words = []
         for part in parts[1:]:
-            if not re.fullmatch(r'[a-z][a-z-]*(?:\|[a-z][a-z-]*)*', part):
+            if part.startswith(('--', '[', '<')):
                 break
+            if not re.fullmatch(r'[a-z][a-z0-9_-]*(?:\|[a-z][a-z0-9_-]*)*', part):
+                raise ValueError('Unrecognized command token in CLI help: ' + part)
             words.append(part.split('|'))
         if not words:
             raise ValueError('Missing command in CLI usage')
@@ -35,7 +37,7 @@ def check_commands(readme, help_text):
     if readme.count(START) != 1 or readme.count(END) != 1:
         raise ValueError('README needs exactly one marked Commands table')
     section = readme.split(START)[1].split(END)[0]
-    rows = re.findall(r'^\| `(h2a [a-z -]+)` \|', section, re.MULTILINE)
+    rows = re.findall(r'^\| `(h2a [^`]+)` \|', section, re.MULTILINE)
     if len(rows) != len(set(rows)):
         raise ValueError('Duplicate README command')
     expected = help_commands(help_text)
