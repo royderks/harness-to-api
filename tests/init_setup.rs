@@ -40,3 +40,45 @@ fn missing_selected_harness_returns_actionable_json_without_state_changes() {
         assert!(!state.exists());
     }
 }
+
+#[test]
+fn installed_pi_with_invalid_extension_gets_extension_specific_guidance() {
+    let temp = tempfile::tempdir().unwrap();
+    let pi = temp
+        .path()
+        .join(if cfg!(windows) { "pi.exe" } else { "pi" });
+    std::fs::copy(env!("CARGO_BIN_EXE_h2a"), pi).unwrap();
+    let state = temp.path().join("state");
+    let empty_extension = temp.path().join("empty-extension");
+    std::fs::create_dir(&empty_extension).unwrap();
+    for extension in ["", "relative/pi-bob", empty_extension.to_str().unwrap()] {
+        let output = Command::new(env!("CARGO_BIN_EXE_h2a"))
+            .args([
+                "init",
+                "--provider",
+                "ibm-bob",
+                "--model",
+                "ibm-bob/default",
+                "--state-dir",
+                state.to_str().unwrap(),
+                "--port",
+                "8787",
+                "--pi-bob-extension",
+                extension,
+                "--no-probe",
+                "--json",
+            ])
+            .env("PATH", temp.path())
+            .env("PATHEXT", ".EXE")
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(3));
+        let event: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(event["code"], "bob_extension_required");
+        let next = event["next_step"].as_str().unwrap();
+        assert!(next.contains("extensions/bob.ts"));
+        assert!(next.contains("h2a init --provider ibm-bob --pi-bob-extension"));
+        assert!(!next.contains("pi-coding-agent"));
+        assert!(!state.exists());
+    }
+}

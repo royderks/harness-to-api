@@ -217,19 +217,22 @@ async fn start(args: &[String], output: &Output, cancel: CancellationToken) -> R
     let mut prompts = interactive.then(Prompts::new);
     if let Some(prompts) = &mut prompts {
         if provider.is_empty() {
-            eprintln!("Which harness would you like to add?");
+            eprintln!("Which harness would you like to use or add?");
+            let mut default = None;
             for (index, candidate) in harness::Provider::ALL.into_iter().enumerate() {
+                let installed = find_binary(candidate.binary()).is_some();
+                if installed && default.is_none() {
+                    default = Some(candidate);
+                }
                 eprintln!(
-                    "  {}. {} ({})",
+                    "  {}. {} ({}){}",
                     index + 1,
                     harness_setup::name(candidate),
-                    candidate.id()
+                    candidate.id(),
+                    if installed { " — installed" } else { "" },
                 );
             }
-            let default = harness::Provider::ALL
-                .into_iter()
-                .find(|p| find_binary(p.binary()).is_some())
-                .unwrap_or(harness::Provider::Codex);
+            let default = default.unwrap_or(harness::Provider::Codex);
             loop {
                 let answer = prompts
                     .ask(&cancel, "Harness (number or name)", default.id())
@@ -333,11 +336,19 @@ async fn start(args: &[String], output: &Output, cancel: CancellationToken) -> R
     )
     .map_err(arguments)?;
     let adapters = adapters(&selected, &adapter_flags).map_err(|_| {
-        fail(
-            3,
-            "harness_missing",
-            harness_setup::instructions(selected[0], cfg!(windows)),
-        )
+        if selected[0] == harness::Provider::IbmBob && find_binary("pi").is_some() {
+            fail(
+                3,
+                "bob_extension_required",
+                harness_setup::bob_extension_instructions(),
+            )
+        } else {
+            fail(
+                3,
+                "harness_missing",
+                harness_setup::instructions(selected[0], cfg!(windows)),
+            )
+        }
     })?;
     let endpoint = format!("http://127.0.0.1:{port}/v1");
     let mut probe = f.boolean("probe");

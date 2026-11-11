@@ -17,7 +17,12 @@ pub fn choice(value: &str) -> Option<Provider> {
         .ok()
         .and_then(|n| n.checked_sub(1))
         .and_then(|n| Provider::ALL.get(n).copied())
-        .or_else(|| Provider::parse(value))
+        .or_else(|| {
+            Provider::ALL.into_iter().find(|&provider| {
+                provider.id().eq_ignore_ascii_case(value)
+                    || name(provider).eq_ignore_ascii_case(value)
+            })
+        })
 }
 
 pub fn instructions(provider: Provider, windows: bool) -> String {
@@ -83,11 +88,29 @@ pub fn instructions(provider: Provider, windows: bool) -> String {
             "https://pi.dev/packages/pi-bob",
         ),
     };
+    let retry = if provider == Provider::IbmBob {
+        "h2a init --provider ibm-bob --pi-bob-extension \"$(npm root -g)/pi-bob\"".to_string()
+    } else {
+        format!("h2a init --provider {}", provider.id())
+    };
     format!(
-        "Add {}:\n{note}\n  {install}\n\nThen sign in:\n\n  {login}\n\nOpen a new terminal if the installer changes PATH, then rerun:\n\n  h2a init --provider {}\n\nSetup guide: {docs}",
+        "Add {}:\n{note}\n  {install}\n\nThen sign in:\n\n  {login}\n\nOpen a new terminal if the installer changes PATH, then rerun:\n\n  {retry}\n\nSetup guide: {docs}",
         name(provider),
-        provider.id(),
     )
+}
+
+pub fn bob_extension_instructions() -> &'static str {
+    "Pi is installed. Set --pi-bob-extension to an absolute pi-bob package directory containing extensions/bob.ts.
+
+Install the community extension if needed:
+
+  npm install -g pi-bob@0.2.6
+
+Then retry interactive setup:
+
+  h2a init --provider ibm-bob --pi-bob-extension \"$(npm root -g)/pi-bob\"
+
+For noninteractive setup, correct --pi-bob-extension and keep your other required flags."
 }
 
 #[cfg(test)]
@@ -99,6 +122,8 @@ mod tests {
         for (index, provider) in Provider::ALL.into_iter().enumerate() {
             assert_eq!(choice(&(index + 1).to_string()), Some(provider));
             assert_eq!(choice(provider.id()), Some(provider));
+            assert_eq!(choice(name(provider)), Some(provider));
+            assert_eq!(choice(&name(provider).to_uppercase()), Some(provider));
             for windows in [false, true] {
                 let text = instructions(provider, windows);
                 assert!(text.contains(&format!("h2a init --provider {}", provider.id())));
