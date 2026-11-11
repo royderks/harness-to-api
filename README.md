@@ -12,12 +12,7 @@ The project is **harness-to-api**; the executable is `h2a`.
 
 Install and start h2a:
 
-**macOS**
-```sh
-curl -fsSL https://raw.githubusercontent.com/royderks/harness-to-api/main/install.sh | sh
-```
-
-**Linux**
+**macOS / Linux**
 ```sh
 curl -fsSL https://raw.githubusercontent.com/royderks/harness-to-api/main/install.sh | sh
 ```
@@ -66,16 +61,11 @@ curl http://127.0.0.1:8787/v1/chat/completions \
 | `h2a keys inspect` | Show a key's policy and durable usage. |
 | `h2a keys explain` | Check whether a model would be allowed by a key and supplied configuration. |
 | `h2a keys revoke` | Revoke a key and cancel its active managed requests. |
-| `h2a factory validate` | Validate the repository's issue seed manifest locally. |
-| `h2a factory plan` | Compare seeds with GitHub without publishing changes. |
-| `h2a factory seed` | Publish seed labels/issues when explicitly requested with `--apply`. |
-| `h2a factory adopt` | Explicitly bind a seed to an existing GitHub issue in the local journal. |
-| `h2a factory recover` | Reconcile an uncertain issue publication before retrying. |
 | `h2a version` | Print the gateway version; also available as `h2a --version`. |
 | `h2a help` | Show usage; also available as `h2a --help` or `h2a -h`. |
 <!-- commands:end -->
 
-For command flags, use commands such as `h2a help serve` or `h2a keys create --help`. See the [CLI guide](docs/cli.md) and [factory guide](docs/factory.md) for full usage, including factory arguments.
+For command flags, use commands such as `h2a help serve` or `h2a keys create --help`. See the [CLI guide](docs/cli.md) for full usage.
 
 ## Supported harnesses
 

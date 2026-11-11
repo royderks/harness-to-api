@@ -77,6 +77,16 @@ class CommandReference(unittest.TestCase):
     def test_subcommands_and_flags(self):
         self.assertEqual(readme.check_commands(self.TABLE, self.HELP), 5)
 
+    def test_factory_commands_are_outside_readme_scope(self):
+        help_text = self.HELP.replace('  h2a help',
+                                      '  h2a factory validate|plan|seed|adopt|recover [flags]\n  h2a help')
+        self.assertEqual(readme.check_commands(self.TABLE, help_text), 5)
+        with self.assertRaises(ValueError):
+            readme.check_commands(self.TABLE.replace('h2a init repair', 'h2a factory seed'), help_text)
+        with self.assertRaises(ValueError):
+            readme.check_commands(self.TABLE, help_text.replace('  h2a help',
+                                                                '  h2a factory-reset\n  h2a help'))
+
     def test_omitted_new_obsolete_and_duplicate_commands_fail(self):
         for table, help_text in [
             (self.TABLE.replace('| `h2a init` | Description |', ''), self.HELP),

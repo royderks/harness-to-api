@@ -40,7 +40,9 @@ def check_commands(readme, help_text):
     rows = re.findall(r'^\| `(h2a [^`]+)` \|', section, re.MULTILINE)
     if len(rows) != len(set(rows)):
         raise ValueError('Duplicate README command')
-    expected = help_commands(help_text)
+    # Repository-maintenance commands are documented in the factory guide.
+    expected = {command for command in help_commands(help_text)
+                if command.split()[1] != 'factory'}
     missing, extra = expected - set(rows), set(rows) - expected
     if missing or extra:
         raise ValueError(f'Command reference mismatch: missing={sorted(missing)}, extra={sorted(extra)}')
