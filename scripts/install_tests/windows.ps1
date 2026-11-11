@@ -19,7 +19,7 @@ try {
         param($Uri, $OutFile, [switch]$UseBasicParsing)
         if ($Uri -like '*checksums*') {
             $archive = ($Uri.Split('/')[-1] -replace '^checksums_', 'h2a_' -replace '\.txt$', '.tar.gz')
-            Set-Content -LiteralPath $OutFile -Value (('0' * 64) + '  ' + $archive)
+            Set-Content -LiteralPath $OutFile -Value (('0' * 64) + ' *' + $archive)
         } else {
             Microsoft.PowerShell.Utility\Invoke-WebRequest -UseBasicParsing -Uri $Uri -OutFile $OutFile
         }

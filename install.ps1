@@ -27,7 +27,7 @@ function Install-H2a {
         Invoke-WebRequest -UseBasicParsing -Uri "$base/$archive" -OutFile (Join-Path $temp $archive)
         Invoke-WebRequest -UseBasicParsing -Uri "$base/checksums_${version}_windows_${arch}.txt" -OutFile (Join-Path $temp 'checksum')
         $checksum = (Get-Content -Raw -LiteralPath (Join-Path $temp 'checksum')).Trim()
-        if ($checksum -notmatch ('^([a-fA-F0-9]{64})\s+' + [regex]::Escape($archive) + '$')) {
+        if ($checksum -notmatch ('^([a-fA-F0-9]{64})\s+\*?' + [regex]::Escape($archive) + '$')) {
             throw 'Invalid release checksum.'
         }
         $expected = $Matches[1]
@@ -45,7 +45,7 @@ function Install-H2a {
         $staged = Join-Path $destination ('.h2a-install-' + [Guid]::NewGuid())
         Copy-Item -LiteralPath $binary.FullName -Destination $staged
         if (Test-Path -LiteralPath $target) {
-            [IO.File]::Replace($staged, $target, $null)
+            [IO.File]::Replace($staged, $target, [NullString]::Value)
         } else {
             [IO.File]::Move($staged, $target)
         }
