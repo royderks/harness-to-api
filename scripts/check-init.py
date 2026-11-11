@@ -369,8 +369,10 @@ def main():
             interactive_state, interactive_port = root / 'interactive', port()
             installed_path = root / 'installed-harnesses'
             installed_path.mkdir()
-            for name in ('codex', 'gemini'):
+            for name in ('codex', 'gemini', 'pi'):
                 shutil.copy2(fixture, installed_path / name)
+            (installed_path / 'claude').write_text('not executable')
+            (installed_path / 'claude').chmod(0o600)
             installed_env = dict(env, PATH=str(installed_path))
             master, slave = pty.openpty()
             interactive = subprocess.Popen([BIN, 'init'], env=installed_env, stdin=slave, stdout=slave, stderr=slave)
@@ -403,7 +405,9 @@ def main():
             check('binary missing' not in transcript.decode(errors='replace'), 'installed flow printed missing harnesses')
             menu = transcript.decode(errors='replace')
             check('Codex (codex) — installed' in menu and 'Gemini CLI (gemini) — installed' in menu, 'installed harnesses were not marked')
-            check(menu.count('— installed') == 2, 'chooser marked a harness outside PATH as installed')
+            check(menu.count('— installed') == 2, 'chooser marked an unavailable harness as installed')
+            check('— Pi installed; Bob extension not checked' in menu, 'Pi presence implied a verified Bob extension')
+            check('Claude Code (claude) — installed' not in menu, 'non-executable file marked installed')
             print('PASS: installed harness chooser and interactive client request')
 
             malformed = run('init', '--provider', 'codex', '--json')

@@ -229,7 +229,12 @@ async fn start(args: &[String], output: &Output, cancel: CancellationToken) -> R
                     index + 1,
                     harness_setup::name(candidate),
                     candidate.id(),
-                    if installed { " — installed" } else { "" },
+                    match (installed, candidate) {
+                        (true, harness::Provider::IbmBob) =>
+                            " — Pi installed; Bob extension not checked",
+                        (true, _) => " — installed",
+                        (false, _) => "",
+                    },
                 );
             }
             let default = default.unwrap_or(harness::Provider::Codex);

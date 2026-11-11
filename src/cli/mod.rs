@@ -201,21 +201,9 @@ async fn serve(args: &[String]) -> anyhow::Result<()> {
     app.serve(listener, signal()).await
 }
 fn find_binary(binary: &str) -> Option<PathBuf> {
-    let path = Path::new(binary);
-    if path.components().count() > 1 {
-        return path.is_file().then(|| path.to_path_buf());
-    }
-    std::env::split_paths(&std::env::var_os("PATH")?).find_map(|dir| {
-        let file = dir.join(binary);
-        if file.is_file() {
-            Some(file)
-        } else if cfg!(windows) && file.with_extension("exe").is_file() {
-            Some(file.with_extension("exe"))
-        } else {
-            None
-        }
-    })
+    harness::resolve_executable(Path::new(binary))
 }
+
 async fn doctor(args: &[String]) -> anyhow::Result<()> {
     if args::help(args) {
         command_help(

@@ -43,10 +43,19 @@ fn missing_selected_harness_returns_actionable_json_without_state_changes() {
 
 #[test]
 fn installed_pi_with_invalid_extension_gets_extension_specific_guidance() {
+    check_pi_extension_guidance(if cfg!(windows) { "pi.exe" } else { "pi" }, ".EXE");
+}
+
+#[cfg(windows)]
+#[test]
+fn pi_cmd_shim_is_detected_before_extension_validation() {
+    check_pi_extension_guidance("pi.cmd", ".CMD;.EXE");
+}
+
+fn check_pi_extension_guidance(binary: &str, pathext: &str) {
     let temp = tempfile::tempdir().unwrap();
-    let pi = temp
-        .path()
-        .join(if cfg!(windows) { "pi.exe" } else { "pi" });
+    let pi = temp.path().join(binary);
+    // The executable is only resolved: extension validation precedes invocation.
     std::fs::copy(env!("CARGO_BIN_EXE_h2a"), pi).unwrap();
     let state = temp.path().join("state");
     let empty_extension = temp.path().join("empty-extension");
@@ -69,7 +78,7 @@ fn installed_pi_with_invalid_extension_gets_extension_specific_guidance() {
                 "--json",
             ])
             .env("PATH", temp.path())
-            .env("PATHEXT", ".EXE")
+            .env("PATHEXT", pathext)
             .output()
             .unwrap();
         assert_eq!(output.status.code(), Some(3));
