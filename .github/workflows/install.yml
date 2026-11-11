@@ -1,0 +1,39 @@
+name: Installers
+on:
+  pull_request:
+    paths: ['install.sh', 'install.ps1', 'scripts/install_tests/**', '.github/workflows/install.yml']
+  push:
+    branches: [main]
+    paths: ['install.sh', 'install.ps1', 'scripts/install_tests/**', '.github/workflows/install.yml']
+permissions:
+  contents: read
+concurrency:
+  group: installers-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Unix installer regressions
+        if: runner.os != 'Windows'
+        run: python3 -m unittest discover -s scripts/install_tests -v
+      - name: Unix published binary smoke
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          testdir=$(mktemp -d)
+          trap 'rm -rf "$testdir"' EXIT
+          H2A_INSTALL_ONLY=1 H2A_INSTALL_DIR="$testdir/bin" sh install.sh
+          test "$("$testdir/bin/h2a" version)" = v0.1.0
+      - name: Windows published binary and checksum refusal
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/install_tests/windows.ps1

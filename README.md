@@ -10,31 +10,24 @@ The project is **harness-to-api**; the executable is `h2a`.
 
 ## Getting started
 
-Install the [Codex CLI](https://learn.chatgpt.com/docs/cli) and sign in with `codex login`. On macOS or Linux, download and verify the native binary, then install it on your PATH:
+Install the [Codex CLI](https://learn.chatgpt.com/docs/cli) and sign in with `codex login`. Then install and start h2a:
 
+**macOS**
 ```sh
-platform="$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
-release="https://github.com/royderks/harness-to-api/releases/download/v0.1.0"
-curl -fsSLO "$release/h2a_v0.1.0_${platform}.tar.gz" &&
-curl -fsSLO "$release/checksums_v0.1.0_${platform}.txt" &&
-(if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum -c "checksums_v0.1.0_${platform}.txt"
-else
-  shasum -a 256 -c "checksums_v0.1.0_${platform}.txt"
-fi) &&
-mkdir -p h2a-v0.1.0 "$HOME/.local/bin" &&
-tar -xzf "h2a_v0.1.0_${platform}.tar.gz" -C h2a-v0.1.0 ./h2a &&
-install -m 755 h2a-v0.1.0/h2a "$HOME/.local/bin/h2a" &&
-export PATH="$HOME/.local/bin:$PATH"
+curl -fsSL https://raw.githubusercontent.com/royderks/harness-to-api/main/install.sh | sh
 ```
 
-Then start the gateway:
-
+**Linux**
 ```sh
-h2a init --provider codex
+curl -fsSL https://raw.githubusercontent.com/royderks/harness-to-api/main/install.sh | sh
 ```
 
-No Rust toolchain is needed. See [binary installation](docs/distribution.md) for Windows PowerShell, platform requirements, unsigned-app notices, and making the PATH change permanent.
+**Windows (PowerShell)**
+```powershell
+irm https://raw.githubusercontent.com/royderks/harness-to-api/main/install.ps1 | iex
+```
+
+The command installs h2a and opens interactive setup. Select your harness and keep the terminal open while the gateway runs. No Rust needed. See [installation details](docs/distribution.md) for manual downloads and requirements.
 
 It shows the provider, endpoint, state location, and bounded key policy before setup. A live probe is a separate opt-in; setup alone does not make an inference request. The endpoint is unverified until a probe succeeds. Keep the process running and stop it with Ctrl+C. See [onboarding](docs/onboarding.md) for a client example, automation, and recovery.
 

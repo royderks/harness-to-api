@@ -34,6 +34,18 @@ the README Commands table with built CLI help. Release verification repeats that
 comparison using the README and binary extracted from each archive, so missing or
 obsolete command rows prevent a draft release.
 
+## Installer checks
+
+```sh
+python3 -m unittest discover -s scripts/install_tests -v
+```
+
+The Unix tests use local archives and a mocked download boundary to check platform
+selection, repeat installation, checksum refusal, and terminal input after a pipe.
+The installer workflow also installs the published binary on native macOS, Linux,
+and Windows runners, checks its version, and tests Windows repeat installation and
+checksum refusal using Windows PowerShell 5.1. These checks use no provider accounts.
+
 ## Coverage
 
 - API authentication, model visibility, text completions, SSE, strict request validation, and sanitized errors.
