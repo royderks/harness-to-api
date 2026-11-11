@@ -1,4 +1,5 @@
 mod args;
+mod harness_setup;
 mod init;
 mod keys;
 mod probe;
@@ -13,7 +14,7 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 
-const HELP: &str = "h2a — Your coding harness, as an authenticated OpenAI-compatible API.\n\nUsage:\n  h2a init [--provider codex --model codex/default --state-dir PATH --port 8787 --no-probe --json]\n  h2a init repair --state-dir PATH --discard --yes\n  h2a doctor\n  h2a keys create|list|revoke|inspect|explain [flags]\n  h2a probe --model provider/model [--base-url URL]\n  h2a serve [--provider codex[,gemini,...]|all] [--port 8787]\n  h2a share [--via tailscale|funnel|cloudflare] [--port 8787]\n  h2a factory validate|plan|seed|adopt|recover\n  h2a version\n  h2a help [command]\n\nGet started:\n  1. Install and sign in to an official harness CLI (for Codex: codex login).\n  2. h2a init\n  3. Use the printed client example in another terminal; Ctrl+C stops the server.\n\nUse h2a <command> --help for flags. Init stores a protected client credential;\nkeys create prints a new key once to stdout. Keep both secret.\nSet HARNESS_API_STATE_DIR to choose the private local state directory.";
+const HELP: &str = "h2a — Your coding harness, as an authenticated OpenAI-compatible API.\n\nUsage:\n  h2a init [--provider codex --model codex/default --state-dir PATH --port 8787 --no-probe --json]\n  h2a init repair --state-dir PATH --discard --yes\n  h2a doctor\n  h2a keys create|list|revoke|inspect|explain [flags]\n  h2a probe --model provider/model [--base-url URL]\n  h2a serve [--provider codex[,gemini,...]|all] [--port 8787]\n  h2a share [--via tailscale|funnel|cloudflare] [--port 8787]\n  h2a factory validate|plan|seed|adopt|recover\n  h2a version\n  h2a help [command]\n\nGet started:\n  1. h2a init\n  2. Choose a harness; follow its install and sign-in steps if prompted.\n  3. Use the printed client example in another terminal; Ctrl+C stops the server.\n\nUse h2a <command> --help for flags. Init stores a protected client credential;\nkeys create prints a new key once to stdout. Keep both secret.\nSet HARNESS_API_STATE_DIR to choose the private local state directory.";
 
 pub async fn run(mut args: Vec<String>) -> i32 {
     if args.first().is_some_and(|s| s == "help") && args.len() > 1 {
@@ -200,21 +201,9 @@ async fn serve(args: &[String]) -> anyhow::Result<()> {
     app.serve(listener, signal()).await
 }
 fn find_binary(binary: &str) -> Option<PathBuf> {
-    let path = Path::new(binary);
-    if path.components().count() > 1 {
-        return path.is_file().then(|| path.to_path_buf());
-    }
-    std::env::split_paths(&std::env::var_os("PATH")?).find_map(|dir| {
-        let file = dir.join(binary);
-        if file.is_file() {
-            Some(file)
-        } else if cfg!(windows) && file.with_extension("exe").is_file() {
-            Some(file.with_extension("exe"))
-        } else {
-            None
-        }
-    })
+    harness::resolve_executable(Path::new(binary))
 }
+
 async fn doctor(args: &[String]) -> anyhow::Result<()> {
     if args::help(args) {
         command_help(

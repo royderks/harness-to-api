@@ -10,7 +10,7 @@ The project is **harness-to-api**; the executable is `h2a`.
 
 ## Getting started
 
-Install the [Codex CLI](https://learn.chatgpt.com/docs/cli) and sign in with `codex login`. Then install and start h2a:
+Install and start h2a:
 
 **macOS**
 ```sh
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/royderks/harness-to-api/main/instal
 irm https://raw.githubusercontent.com/royderks/harness-to-api/main/install.ps1 | iex
 ```
 
-The command installs h2a and opens interactive setup. Select your harness and keep the terminal open while the gateway runs. No Rust needed. See [installation details](docs/distribution.md) for manual downloads and requirements.
+The command installs h2a and asks which harness you want to use or add, marking the ones already installed. If needed, setup shows its installation and sign-in commands. Keep the terminal open while the gateway runs. No Rust needed. See [installation details](docs/distribution.md) for manual downloads and requirements.
 
 It shows the provider, endpoint, state location, and bounded key policy before setup. A live probe is a separate opt-in; setup alone does not make an inference request. The endpoint is unverified until a probe succeeds. Keep the process running and stop it with Ctrl+C. See [onboarding](docs/onboarding.md) for a client example, automation, and recovery.
 
