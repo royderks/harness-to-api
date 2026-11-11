@@ -6,9 +6,32 @@ The executable needs no Rust, Cargo, Node.js, or Python. Your selected harness
 still needs its own installation and login. Python is only needed for Python
 client examples.
 
-Release downloads follow repository visibility. For a private repository, sign
-in with an account that has access, or use authenticated `gh release download`.
-An unauthenticated 404 does not establish that an asset is missing.
+## One-line installation
+
+The [README quickstart](../README.md#getting-started) runs the repository's
+[Unix installer](../install.sh) or [Windows installer](../install.ps1). Each selects
+x86-64 or ARM64, downloads the published **v0.1.0** archive over HTTPS, verifies its
+SHA-256 checksum, and installs only the executable into `$HOME/.local/bin`.
+It then starts `h2a init` in the foreground, which detects installed harnesses and
+walks through setup. Installation needs no administrator privileges and does not
+access harness credentials.
+Stop a running gateway before replacing its binary.
+
+The Unix command needs `curl`, `tar`, and `sha256sum` or `shasum`. Windows needs
+PowerShell 5.1+ and the built-in `tar.exe`. Commands execute the installer from this
+repository; read the scripts first or use the manual instructions below if preferred.
+Temporary downloads are removed on success or failure. A failed download or checksum
+leaves the installed executable unchanged. `H2A_INSTALL_DIR` can select another
+absolute installation directory.
+
+An interactive terminal is required to start setup. Set `H2A_INSTALL_ONLY=1` to
+install without starting it (for scripts and CI). On Unix the installer reconnects
+setup to `/dev/tty` because the installer itself arrives through a pipe.
+
+The executable is installed in `$HOME/.local/bin`. For future Unix
+terminals, add `export PATH="$HOME/.local/bin:$PATH"` to your shell configuration.
+On Windows, add `%USERPROFILE%\.local\bin` to your user Path in Environment Variables.
+The installer does not edit shell profiles, execution policy, or persistent PATH.
 
 ## Select your archive
 
@@ -118,5 +141,4 @@ evidence, download and check the attached bytes, then publish the draft explicit
 Do not replace assets under an already published version; publish a new patch version.
 
 Homebrew, npm and Windows package managers remain separate work under
-[issue #13](https://github.com/royderks/harness-to-api/issues/13). No registry package
-or automatic installer is implied by a GitHub release.
+[issue #13](https://github.com/royderks/harness-to-api/issues/13). No registry package is published yet.

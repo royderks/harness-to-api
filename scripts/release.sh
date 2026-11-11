@@ -38,7 +38,7 @@ fi
 )
 mkdir -p "$folder"
 cp "target/$target/release/$executable" "$folder/"
-cp "$snapshot/LICENSE" "$snapshot/README.md" "$snapshot/CONTRIBUTING.md" "$folder/"
+cp "$snapshot/LICENSE" "$snapshot/README.md" "$snapshot/CONTRIBUTING.md" "$snapshot/install.sh" "$snapshot/install.ps1" "$folder/"
 cp -R "$snapshot/docs" "$snapshot/examples" "$folder/"
 mkdir -p "$folder/demo"
 cp "$snapshot"/demo/*.py "$snapshot"/demo/*.sh "$folder/demo/"
