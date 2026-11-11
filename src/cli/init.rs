@@ -1,7 +1,7 @@
 use super::{
     adapters,
     args::{self, Flags},
-    find_binary, providers, signal, state,
+    find_binary, harness_setup, providers, signal, state,
 };
 use crate::{api, auth, harness, initprofile};
 use serde_json::{Value, json};
@@ -16,10 +16,14 @@ type Result<T> = std::result::Result<T, Failure>;
 struct Failure {
     status: i32,
     code: &'static str,
-    next: &'static str,
+    next: String,
 }
-fn fail(status: i32, code: &'static str, next: &'static str) -> Failure {
-    Failure { status, code, next }
+fn fail(status: i32, code: &'static str, next: impl Into<String>) -> Failure {
+    Failure {
+        status,
+        code,
+        next: next.into(),
+    }
 }
 fn io_error<E>(_: E) -> Failure {
     fail(
@@ -74,6 +78,7 @@ impl Output {
                 s("verification")
             ),
             "stopped" => println!("Stopped: {}.", s("reason")),
+            "error" if s("code") == "harness_missing" => eprintln!("\n{}", s("next_step")),
             "error" => eprintln!("h2a init: {}; {}", s("code"), s("next_step")),
             _ => {}
         }
@@ -211,27 +216,44 @@ async fn start(args: &[String], output: &Output, cancel: CancellationToken) -> R
     let mut bob = f.get("pi-bob-extension", "").to_string();
     let mut prompts = interactive.then(Prompts::new);
     if let Some(prompts) = &mut prompts {
-        let mut first = "";
-        for p in harness::Provider::ALL {
-            let found = find_binary(p.binary()).is_some();
-            if found && first.is_empty() {
-                first = p.id();
-            }
-            eprintln!(
-                "{}: binary {}; login unknown; model access unknown",
-                p.id(),
-                if found { "found" } else { "missing" }
-            );
-        }
         if provider.is_empty() {
-            if first.is_empty() {
-                return Err(fail(
-                    3,
-                    "harness_missing",
-                    "Install and sign in to a supported official harness, then rerun init.",
-                ));
+            eprintln!("Which harness would you like to add?");
+            for (index, candidate) in harness::Provider::ALL.into_iter().enumerate() {
+                eprintln!(
+                    "  {}. {} ({})",
+                    index + 1,
+                    harness_setup::name(candidate),
+                    candidate.id()
+                );
             }
-            provider = prompts.ask(&cancel, "Provider", first).await?;
+            let default = harness::Provider::ALL
+                .into_iter()
+                .find(|p| find_binary(p.binary()).is_some())
+                .unwrap_or(harness::Provider::Codex);
+            loop {
+                let answer = prompts
+                    .ask(&cancel, "Harness (number or name)", default.id())
+                    .await?;
+                if let Some(chosen) = harness_setup::choice(&answer) {
+                    provider = chosen.id().to_string();
+                    break;
+                }
+                eprintln!("Choose a number from 1 to 6 or a harness name.");
+            }
+        }
+        let chosen = harness::Provider::parse(&provider).ok_or_else(|| {
+            fail(
+                2,
+                "invalid_provider",
+                "Choose exactly one supported provider; see h2a init --help.",
+            )
+        })?;
+        if find_binary(chosen.binary()).is_none() {
+            return Err(fail(
+                3,
+                "harness_missing",
+                harness_setup::instructions(chosen, cfg!(windows)),
+            ));
         }
         if model.is_empty() {
             model = prompts
@@ -310,7 +332,13 @@ async fn start(args: &[String], output: &Output, cancel: CancellationToken) -> R
         &[],
     )
     .map_err(arguments)?;
-    let adapters=adapters(&selected,&adapter_flags).map_err(|_|fail(3,"harness_missing","Install the selected harness and sign in using its official CLI; community IBM Bob also needs --pi-bob-extension containing extensions/bob.ts."))?;
+    let adapters = adapters(&selected, &adapter_flags).map_err(|_| {
+        fail(
+            3,
+            "harness_missing",
+            harness_setup::instructions(selected[0], cfg!(windows)),
+        )
+    })?;
     let endpoint = format!("http://127.0.0.1:{port}/v1");
     let mut probe = f.boolean("probe");
     output.emit("plan",json!({"provider":provider,"endpoint":endpoint,"model":model,"state_dir":path,"credential_path":path.join("init/client.key"),"lifetime":"foreground","key_ttl":"1h","max_requests":20,"request_timeout":"90s","requests_per_minute":5,"max_concurrent":1,"binary":"found","login":"unknown","model_access":"unknown","probe_requested":probe}))?;

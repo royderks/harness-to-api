@@ -325,6 +325,45 @@ def main():
             check(inspect(state, other_id) == other_before, 'repair changed an unrelated key')
             print('PASS: revoked setup requires explicit repair; unrelated key remains unchanged')
 
+            # A fresh machine still gets a choice, then guidance for just that selection.
+            for selection, command in [('1', 'chatgpt.com/codex/install.sh'),
+                                       ('invalid\n5', 'claude.ai/install.sh'),
+                                       ('gemini', 'npm install -g @google/gemini-cli')]:
+                missing_state = root / ('missing-' + selection.replace('\n', '-'))
+                empty_path = root / 'no-harnesses'
+                empty_path.mkdir(exist_ok=True)
+                missing_env = dict(env, PATH=str(empty_path), HARNESS_API_STATE_DIR=str(missing_state))
+                master, slave = pty.openpty()
+                missing = subprocess.Popen([BIN, 'init'], env=missing_env, stdin=slave, stdout=slave, stderr=slave)
+                processes.append(missing)
+                os.close(slave)
+                transcript = bytearray()
+                try:
+                    os.write(master, (selection + '\n').encode())
+                    deadline = time.monotonic() + 8
+                    while True:
+                        check(time.monotonic() < deadline, 'missing-harness choice timed out')
+                        if select.select([master], [], [], .1)[0]:
+                            try:
+                                chunk = os.read(master, 65536)
+                            except OSError:
+                                break
+                            if not chunk:
+                                break
+                            transcript.extend(chunk)
+                    missing.wait(timeout=3)
+                    text = transcript.decode(errors='replace')
+                    check(missing.returncode == 3, 'missing selection should give prerequisite guidance')
+                    check('Which harness would you like to add?' in text and command in text, 'choice did not provide selected install command')
+                    check('binary missing' not in text and 'binary found' not in text and 'harness_missing' not in text, 'init printed a binary inventory or technical error instead of guidance')
+                    check('Model [' not in text and 'State directory [' not in text, 'setup asked for details before install guidance')
+                    check(not missing_state.exists(), 'missing harness created gateway state')
+                    if selection.startswith('invalid'):
+                        check('Choose a number from 1 to 6' in text, 'invalid selection did not reprompt')
+                finally:
+                    os.close(master)
+            print('PASS: fresh-machine harness choice and focused installation guidance')
+
             interactive_state, interactive_port = root / 'interactive', port()
             master, slave = pty.openpty()
             interactive = subprocess.Popen([BIN, 'init'], env=env, stdin=slave, stdout=slave, stderr=slave)
@@ -354,6 +393,7 @@ def main():
                 streams.append(transcript.decode(errors='replace'))
             finally:
                 os.close(master)
+            check('binary missing' not in transcript.decode(errors='replace'), 'installed flow printed missing harnesses')
             print('PASS: interactive terminal selection and client request')
 
             malformed = run('init', '--provider', 'codex', '--json')
