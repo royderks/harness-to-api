@@ -115,3 +115,12 @@ six streaming adapters, the two-node graph, the agent, and plain HTTP. It also
 checks exact request accounting, quota denial, revocation, and secret-free output.
 It creates and removes its own temporary state. **It makes no live inference or
 cloud sandbox calls.** See [verification evidence](VERIFICATION.md).
+
+The documented launch commands are recorded in `examples/commands.json` and
+checked against annotated blocks in each example README. Run the lightweight
+documentation check with `python3 scripts/check-example-docs.py`; it also checks
+local links and declared pinned dependencies. The offline runner executes the
+same documented commands for the three local SDK examples. It does not replay
+setup or run Docker, OpenShell, E2B, or Modal commands. OpenShell's checked
+blocks describe manual profile, provider, sandbox, and cleanup operations; the
+check does not execute or validate those resources.

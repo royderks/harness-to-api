@@ -13,14 +13,17 @@ sandbox-service account is required for a local OpenShell installation.
    choose an unused ID/name and update all commands if it already exists.
 2. Register the profile and supply the credential by environment-variable name:
 
+<!-- example-command: openshell-1 -->
 ```sh
 openshell profile lint -f /PRIVATE/PATH/h2a-provider.yaml
 openshell profile import -f /PRIVATE/PATH/h2a-provider.yaml
 openshell provider create --name h2a-demo --type h2a-demo --credential OPENAI_API_KEY
 ```
+<!-- /example-command -->
 
 3. Start one sandbox client. The argument contains source code, not credentials:
 
+<!-- example-command: openshell-2 -->
 ```sh
 openshell sandbox create --name h2a-demo --from python:3.13-slim \
   --provider h2a-demo \
@@ -28,14 +31,17 @@ openshell sandbox create --name h2a-demo --from python:3.13-slim \
   --env H2A_MODEL=codex/default --no-tty -- \
   python3 -c "$(cat examples/_client.py)"
 ```
+<!-- /example-command -->
 
 4. Clean up the resources you created and revoke the dedicated h2a key:
 
+<!-- example-command: openshell-3 -->
 ```sh
 openshell sandbox delete h2a-demo
 openshell provider delete h2a-demo
 openshell profile delete h2a-demo
 ```
+<!-- /example-command -->
 
 One accepted request. These commands target OpenShell 0.1.6. Cloud/sandbox live
 execution of this example is **not yet verified**. The [local routing recipe](../../docs/openshell-live.md)

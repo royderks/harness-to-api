@@ -10,8 +10,13 @@ quality or speed benchmark.
 
 ```sh
 export H2A_MODELS=codex/default,gemini/default
+```
+
+<!-- example-command: harness-switch -->
+```sh
 python examples/harness-switch/main.py
 ```
+<!-- /example-command -->
 
 One accepted request per model, sequentially. SDK streaming prints text as h2a
 receives it; some harnesses emit whole messages rather than token deltas.

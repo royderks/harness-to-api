@@ -12,8 +12,13 @@ python -m pip install e2b==2.10.2
 export OPENAI_BASE_URL=https://YOUR-HOSTNAME/v1
 export H2A_MODEL=codex/default
 # OPENAI_API_KEY: a dedicated h2a key; E2B_API_KEY: your E2B account key.
+```
+
+<!-- example-command: e2b -->
+```sh
 python examples/e2b/main.py
 ```
+<!-- /example-command -->
 
 The script creates a sandbox with a 300-second lifetime, uploads only the
 dependency-free `_client.py`, makes one completion request, and kills the sandbox

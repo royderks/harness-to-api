@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import shlex
 import socket
 import subprocess
 import sys
@@ -20,6 +21,7 @@ PROVIDERS = {"codex": "codex", "antigravity": "antigravity", "ibm-bob": "pi", "g
 
 
 def main():
+    subprocess.run([sys.executable, str(ROOT / "scripts/check-example-docs.py")], check=True)
     print("OFFLINE FIXTURES — real h2a and SDKs, canned harness output; no cloud sandbox or provider calls.", flush=True)
     with tempfile.TemporaryDirectory(prefix="h2a-examples-") as directory:
         state = Path(directory)
@@ -60,8 +62,15 @@ def main():
                            H2A_MODEL="codex/default", H2A_MODELS=models, H2A_REVIEW_MODEL="gemini/default")
                 # Do not let a developer's optional SDK tracing settings export fixture data.
                 env.update(LANGSMITH_TRACING="false", LANGCHAIN_TRACING_V2="false", OPENAI_AGENTS_DISABLE_TRACING="1")
-                for script in ("harness-switch/main.py", "langgraph/main.py", "agents-sdk/main.py", "_client.py"):
-                    result = subprocess.run([sys.executable, str(EXAMPLES / script)], env=env, capture_output=True, text=True, timeout=90)
+                manifest = json.loads((EXAMPLES / "commands.json").read_text())
+                commands = [entry["commands"][0] for entry in manifest.values() if entry["offline"]]
+                commands.append("python examples/_client.py")
+                for documented in commands:
+                    argv = shlex.split(documented)
+                    if len(argv) != 2 or argv[0] != "python":
+                        raise RuntimeError("Invalid offline command: " + documented)
+                    script = argv[1]
+                    result = subprocess.run([sys.executable, script], cwd=ROOT, env=env, capture_output=True, text=True, timeout=90)
                     if token in result.stdout + result.stderr:
                         raise RuntimeError("Credential appeared in client output")
                     if result.returncode or "Hello 🌍" not in result.stdout:

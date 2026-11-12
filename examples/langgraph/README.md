@@ -10,8 +10,13 @@ Follow [gateway setup](../README.md#start-a-bounded-gateway), then:
 python -m pip install langgraph==0.6.11 openai==3.49.0
 export H2A_MODEL=codex/default
 export H2A_REVIEW_MODEL=gemini/default
+```
+
+<!-- example-command: langgraph -->
+```sh
 python examples/langgraph/main.py
 ```
+<!-- /example-command -->
 
 The reviewer defaults to `H2A_MODEL` if unset. Enable and scope both models for a
 cross-harness run. Exactly two accepted requests; no tools, agentic loop, or

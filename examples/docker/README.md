@@ -9,8 +9,13 @@ Docker, and run:
 ```sh
 export OPENAI_BASE_URL=https://YOUR-HOSTNAME/v1
 export H2A_MODEL=codex/default
+```
+
+<!-- example-command: docker -->
+```sh
 python examples/docker/main.py
 ```
+<!-- /example-command -->
 
 `OPENAI_API_KEY` is inherited by variable name, never expanded into Docker command
 arguments. Docker administrators can inspect container environment values. Only

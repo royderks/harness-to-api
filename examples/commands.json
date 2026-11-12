@@ -1,0 +1,65 @@
+{
+  "harness-switch": {
+    "commands": [
+      "python examples/harness-switch/main.py"
+    ],
+    "dependencies": [
+      "openai==3.49.0"
+    ],
+    "offline": true
+  },
+  "langgraph": {
+    "commands": [
+      "python examples/langgraph/main.py"
+    ],
+    "dependencies": [
+      "langgraph==0.6.11",
+      "openai==3.49.0"
+    ],
+    "offline": true
+  },
+  "agents-sdk": {
+    "commands": [
+      "python examples/agents-sdk/main.py"
+    ],
+    "dependencies": [
+      "openai-agents==0.24.0",
+      "openai==3.49.0"
+    ],
+    "offline": true
+  },
+  "docker": {
+    "commands": [
+      "python examples/docker/main.py"
+    ],
+    "dependencies": [],
+    "offline": false
+  },
+  "e2b": {
+    "commands": [
+      "python examples/e2b/main.py"
+    ],
+    "dependencies": [
+      "e2b==2.10.2"
+    ],
+    "offline": false
+  },
+  "modal": {
+    "commands": [
+      "python examples/modal/main.py"
+    ],
+    "dependencies": [
+      "modal==1.2.6"
+    ],
+    "offline": false
+  },
+  "openshell": {
+    "commands": [
+      "openshell profile lint -f /PRIVATE/PATH/h2a-provider.yaml\nopenshell profile import -f /PRIVATE/PATH/h2a-provider.yaml\nopenshell provider create --name h2a-demo --type h2a-demo --credential OPENAI_API_KEY",
+      "openshell sandbox create --name h2a-demo --from python:3.13-slim \\\n  --provider h2a-demo \\\n  --env OPENAI_BASE_URL=https://YOUR-HOSTNAME/v1 \\\n  --env H2A_MODEL=codex/default --no-tty -- \\\n  python3 -c \"$(cat examples/_client.py)\"",
+      "openshell sandbox delete h2a-demo\nopenshell provider delete h2a-demo\nopenshell profile delete h2a-demo"
+    ],
+    "dependencies": [],
+    "offline": false
+  }
+}

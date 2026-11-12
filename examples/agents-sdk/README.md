@@ -9,8 +9,13 @@ Follow [gateway setup](../README.md#start-a-bounded-gateway), then:
 ```sh
 python -m pip install openai-agents==0.24.0 openai==3.49.0
 export H2A_MODEL=codex/default
+```
+
+<!-- example-command: agents-sdk -->
+```sh
 python examples/agents-sdk/main.py
 ```
+<!-- /example-command -->
 
 One accepted request, `max_turns=1`, no tools, handoffs, structured outputs, or
 sampling parameters. Tracing is disabled, so this needs no separate OpenAI API
