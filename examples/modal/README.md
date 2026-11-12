@@ -7,13 +7,18 @@ Prerequisites: [gateway and HTTPS route](../README.md#remote-sandboxes), a Modal
 account with available quota, and local Modal authentication:
 
 ```sh
-python -m pip install modal==1.2.6
+python -m pip install -r examples/requirements.txt
 modal setup
 export OPENAI_BASE_URL=https://YOUR-HOSTNAME/v1
 export H2A_MODEL=codex/default
 # OPENAI_API_KEY must contain a dedicated h2a key.
+```
+
+<!-- example-command: modal -->
+```sh
 python examples/modal/main.py
 ```
+<!-- /example-command -->
 
 The script uses an ephemeral app, a Python 3.13 image, and `Secret.from_dict` to
 inject only the gateway configuration. This is ordinary environment injection,

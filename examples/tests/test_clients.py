@@ -58,13 +58,64 @@ class Clients(unittest.TestCase):
 
     def test_docker_passes_secret_by_environment_not_argv(self):
         module = load("docker")
-        with patch.object(module.subprocess, "run", return_value=Mock(returncode=0)) as execute:
+        owned_id = "a" * 64
+        def docker(args, **kwargs):
+            if args[1] == "run":
+                Path(args[args.index("--cidfile") + 1]).write_text(owned_id)
+            return Mock(returncode=0)
+        with patch.object(module.subprocess, "run", side_effect=docker) as execute:
             module.main()
         invocation = execute.call_args_list[0]
         self.assertNotIn("test-gateway-token", str(invocation.args))
         self.assertIn("OPENAI_API_KEY", invocation.args[0])
         self.assertEqual(invocation.kwargs["env"]["OPENAI_API_KEY"], "test-gateway-token")
-        self.assertEqual(execute.call_args_list[1].args[0][:3], ["docker", "rm", "-f"])
+        self.assertEqual(execute.call_args_list[1].args[0], ["docker", "rm", "-f", owned_id])
+
+    def test_docker_name_collision_does_not_remove_existing_container(self):
+        module = load("docker")
+        with patch.object(module.uuid, "uuid4", return_value=Mock(hex="1" * 32)), patch.object(module.subprocess, "run", return_value=Mock(returncode=125)) as execute:
+            with self.assertRaises(RuntimeError):
+                module.main()
+        self.assertEqual(execute.call_count, 1)
+        args = execute.call_args.args[0]
+        self.assertEqual(args[1], "run")
+        self.assertEqual(args[args.index("--name") + 1], "h2a-example-" + "1" * 12)
+
+    def test_docker_failure_cleans_up_only_recorded_id(self):
+        module = load("docker")
+        owned_id = "b" * 64
+        def docker(args, **kwargs):
+            if args[1] == "run":
+                Path(args[args.index("--cidfile") + 1]).write_text(owned_id)
+                return Mock(returncode=125)
+            return Mock(returncode=0)
+        with patch.object(module.subprocess, "run", side_effect=docker) as execute:
+            with self.assertRaises(RuntimeError):
+                module.main()
+        self.assertEqual(execute.call_args_list[1].args[0], ["docker", "rm", "-f", owned_id])
+
+    def test_docker_timeout_cleans_up_recorded_id(self):
+        module = load("docker")
+        owned_id = "c" * 64
+        def docker(args, **kwargs):
+            if args[1] == "run":
+                Path(args[args.index("--cidfile") + 1]).write_text(owned_id)
+                raise module.subprocess.TimeoutExpired(args, 240)
+            return Mock(returncode=0)
+        with patch.object(module.subprocess, "run", side_effect=docker) as execute:
+            with self.assertRaises(module.subprocess.TimeoutExpired):
+                module.main()
+        self.assertEqual(execute.call_args_list[1].args[0], ["docker", "rm", "-f", owned_id])
+
+    def test_docker_ignores_invalid_id(self):
+        module = load("docker")
+        def docker(args, **kwargs):
+            Path(args[args.index("--cidfile") + 1]).write_text("not-a-container-id")
+            return Mock(returncode=125)
+        with patch.object(module.subprocess, "run", side_effect=docker) as execute:
+            with self.assertRaises(RuntimeError):
+                module.main()
+        self.assertEqual(execute.call_count, 1)
 
 
 if __name__ == "__main__":

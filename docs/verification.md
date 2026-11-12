@@ -65,10 +65,14 @@ python3 -m venv .venv
 python -m pip install -r examples/requirements.txt
 H2A_BIN="$PWD/target/debug/h2a" H2A_FIXTURE="$PWD/target/debug/examples/harness-fixture" python scripts/check-examples.py
 python -m unittest discover -s examples/tests -v
+python3 scripts/check-example-docs.py
+H2A_BIN="$PWD/target/debug/h2a" H2A_FIXTURE="$PWD/target/debug/examples/harness-fixture" python3 scripts/check-docker-example.py
 ```
 
 These run actual framework clients against offline harness fixtures. They do not
-create cloud sandboxes or contact provider accounts. See [example evidence](../examples/VERIFICATION.md).
+create cloud sandboxes or contact provider accounts. The Docker check uses real
+local containers and a temporary test CA. See [example evidence](../examples/VERIFICATION.md)
+and [continuous verification and live setup](examples-testing.md).
 
 ## Factory checks
 

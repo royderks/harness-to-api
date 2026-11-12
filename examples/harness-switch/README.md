@@ -5,13 +5,19 @@ Only the `model` changes between requests. This demonstrates routing, not a mode
 quality or speed benchmark.
 
 1. Follow [gateway setup](../README.md#start-a-bounded-gateway).
-2. Install `openai==3.49.0` in your virtual environment.
+2. Install the pinned `openai` SDK in your virtual environment with
+   `python -m pip install -r examples/requirements.txt` (from the repository root).
 3. Run:
 
 ```sh
 export H2A_MODELS=codex/default,gemini/default
+```
+
+<!-- example-command: harness-switch -->
+```sh
 python examples/harness-switch/main.py
 ```
+<!-- /example-command -->
 
 One accepted request per model, sequentially. SDK streaming prints text as h2a
 receives it; some harnesses emit whole messages rather than token deltas.

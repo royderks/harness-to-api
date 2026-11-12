@@ -1,0 +1,63 @@
+{
+  "harness-switch": {
+    "commands": [
+      "python examples/harness-switch/main.py"
+    ],
+    "dependencies": [
+      "openai"
+    ],
+    "offline": true
+  },
+  "langgraph": {
+    "commands": [
+      "python examples/langgraph/main.py"
+    ],
+    "dependencies": [
+      "langgraph",
+      "openai"
+    ],
+    "offline": true
+  },
+  "agents-sdk": {
+    "commands": [
+      "python examples/agents-sdk/main.py"
+    ],
+    "dependencies": [
+      "openai-agents",
+      "openai"
+    ],
+    "offline": true
+  },
+  "docker": {
+    "commands": [
+      "python examples/docker/main.py"
+    ],
+    "dependencies": [],
+    "offline": false
+  },
+  "e2b": {
+    "commands": [
+      "python examples/e2b/main.py"
+    ],
+    "dependencies": [
+      "e2b"
+    ],
+    "offline": false
+  },
+  "modal": {
+    "commands": [
+      "python examples/modal/main.py"
+    ],
+    "dependencies": [
+      "modal"
+    ],
+    "offline": false
+  },
+  "openshell": {
+    "commands": [
+      "python examples/openshell/main.py"
+    ],
+    "dependencies": [],
+    "offline": false
+  }
+}

@@ -9,8 +9,13 @@ Docker, and run:
 ```sh
 export OPENAI_BASE_URL=https://YOUR-HOSTNAME/v1
 export H2A_MODEL=codex/default
+```
+
+<!-- example-command: docker -->
+```sh
 python examples/docker/main.py
 ```
+<!-- /example-command -->
 
 `OPENAI_API_KEY` is inherited by variable name, never expanded into Docker command
 arguments. Docker administrators can inspect container environment values. Only
@@ -22,5 +27,8 @@ or Ctrl+C. After a forced termination inspect `docker ps -a --filter name=h2a-ex
 and remove only the task's container. Revoke the dedicated h2a key. The public
 Python base image remains in Docker's cache. HTTPS is used to avoid platform-specific
 container-to-host routing and exposing the local gateway on all interfaces.
-The command and cleanup contract is unit-tested; the real container-to-HTTPS
-request remains unverified. See [evidence](../VERIFICATION.md).
+The real container-to-HTTPS path is tested against offline harness fixtures,
+including certificate rejection, completion, quota, revocation and cleanup. For a
+private CA, set `H2A_CA_CERT` to a trusted PEM file; only that file is mounted
+read-only into the container, and normal certificate verification stays enabled.
+The test never changes system trust. Live-provider behavior remains separate. See [evidence](../VERIFICATION.md).

@@ -45,3 +45,25 @@ For a live record, note the exact h2a SHA/version, SDK and harness versions,
 provider/model, route, accepted request count, observed output and resource cleanup.
 Keep credentials and private prompts out of committed evidence. Recording helpers
 and social-post production material are not part of these developer examples.
+
+## Continuous verification added 2026-11-12
+
+On macOS with Docker Desktop's Linux/aarch64 VM, the actual Docker example passed
+through an ephemeral HTTPS proxy to h2a and a canned Codex subprocess. The smoke
+proved rejection of an untrusted certificate, successful completion with the
+scoped test CA, exactly one debit, quota 429, revocation 401 and container cleanup.
+The public Python image remains cached. The same test passed on native Linux
+in [CI run 43303265111](https://github.com/royderks/harness-to-api/actions/runs/43303265111)
+at `f04c88d45b62c2b532b67dc6f0dd4b603bdfd2fc`. Later cleanup and live-evidence
+fixes passed local checks; their current-head hosted result must be checked separately.
+
+All seven README launch commands and local links are now checked. The three SDK
+examples execute their documented commands in the offline runner. Install commands
+read the shared pinned requirements so Dependabot updates can run the compatibility
+suite without copying version numbers into documentation. These checks do not
+replay every setup/sign-in step or visit external documentation links.
+
+The optional live runner and manual hosted workflow produce sanitized timestamped
+reports. No real harness, E2B, Modal or OpenShell live verification is claimed for
+this change. OpenShell is executable on a configured trusted host; the hosted
+workflow does not provision its gateway. See [testing and account setup](../docs/examples-testing.md).

@@ -2,7 +2,7 @@
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from _client import config, run
+from _client import config, require_text, run
 from e2b import Sandbox
 
 
@@ -15,7 +15,7 @@ def main():
         result = sandbox.commands.run("python3 /tmp/h2a-client.py", timeout=170)
         if result.exit_code != 0:
             raise RuntimeError("Sandbox workload failed")
-        print(result.stdout)
+        print(require_text(result.stdout))
     finally:
         sandbox.kill()
         print("E2B sandbox removed.")
