@@ -55,6 +55,7 @@
   },
   "openshell": {
     "commands": [
+      "python examples/openshell/main.py --local",
       "python examples/openshell/main.py"
     ],
     "dependencies": [],

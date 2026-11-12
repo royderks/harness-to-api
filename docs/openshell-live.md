@@ -1,6 +1,8 @@
 # Connect an OpenShell sandbox
 
-This recipe connects a Python client in an OpenShell sandbox to a local Codex-backed gateway. The example uses OpenShell 0.1.6, Python 3.13, and Colima on macOS. Validate the request path on your own host, including streaming if your client uses it. Download the CLI and gateway from the [official release](https://github.com/NVIDIA/OpenShell/releases/tag/v0.1.6) and verify the published checksums.
+For the short runnable example, start with [OpenShell with h2a](../examples/openshell/README.md). No paid OpenShell account or NVIDIA API key is required.
+
+This advanced recipe connects a Python client in an OpenShell sandbox to a local Codex-backed gateway. The example uses OpenShell 0.1.8, Python 3.13, and Colima on macOS. Validate the request path on your own host, including streaming if your client uses it. Download the CLI and gateway from the [official release](https://github.com/NVIDIA/OpenShell/releases/tag/v0.1.8) and verify the published checksums.
 
 ## Configure a local gateway
 
@@ -46,7 +48,7 @@ Use [h2a-provider.yaml](../examples/openshell/h2a-provider.yaml), with its ID se
 ```sh
 openshell profile lint -f /tmp/h2a-openshell-tools/profile.yaml
 openshell profile import -f /tmp/h2a-openshell-tools/profile.yaml
-export OPENAI_API_KEY="$(bin/h2a keys create --state-dir /tmp/h2a-openshell-tools/h2a-state --name openshell-client --models codex/default)"
+export OPENAI_API_KEY="$(bin/h2a keys create --state-dir /tmp/h2a-openshell-tools/h2a-state --name openshell-client --models codex/default --ttl 15m --max-requests 1 --request-timeout 90s --max-concurrent 1)"
 openshell provider create --name h2a-example --type h2a-example --credential OPENAI_API_KEY
 unset OPENAI_API_KEY
 bin/h2a serve --state-dir /tmp/h2a-openshell-tools/h2a-state --provider codex --host 127.0.0.1 --port 18768
@@ -66,11 +68,11 @@ Check for an HTTP success response containing an assistant message. Also verify 
 
 ## Pitfalls and cleanup
 
-- OpenShell 0.1.6 uses `openshell profile lint` and `openshell profile import`, not `openshell provider profile ...`. Lint requires a reachable gateway and rejects an ID already imported. To change an existing profile, export it with its resource version and use `profile update`, or delete and reimport it.
+- OpenShell 0.1.8 uses `openshell profile lint` and `openshell profile import`, not `openshell provider profile ...`. Lint requires a reachable gateway and rejects an ID already imported. To change an existing profile, export it with its resource version and use `profile update`, or delete and reimport it.
 - `--upload` cannot be combined with a trailing command in this CLI. Create the sandbox with the upload, then invoke a separate `openshell sandbox exec`. The command above instead embeds a small client and needs no upload.
 - Match the actual interpreter executable in the profile. The Python image resolves `python3` to `/usr/local/bin/python3.13`; without the versioned pattern, network access failed with `PermissionError`. Narrow the template patterns to the executables in your image.
 - `host.openshell.internal` names a host-side route; sandbox `localhost` is not the host. The Colima reverse forwards were necessary for this loopback-bound native gateway. This HTTP path is a local experiment, not a substitute for authenticated, encrypted transport on an untrusted network. OpenShell requires both network policy and endpoint-bound credentials; see NVIDIA's [inference documentation](https://docs.nvidia.com/openshell/how-it-works/inference).
-- The OpenShell runtime image is not necessarily a workload image. Using `ghcr.io/nvidia/openshell/sandbox:0.1.6` as the workload failed identity resolution; `python:3.13-slim` worked.
+- Use a workload image containing Python, such as `python:3.13-slim`. The supervisor/runtime images are separate infrastructure.
 
 After use, delete the resources you created:
 
@@ -81,3 +83,37 @@ openshell profile delete h2a-example
 ```
 
 Stop the gateway, h2a, and SSH forwarding processes. Remove their private temporary state. For a persistent h2a state directory, revoke the saved key ID with `h2a keys revoke --state-dir PATH KEY_ID`. Leave unrelated Docker resources untouched.
+
+## Verification
+
+Checked on 2026-11-12 with OpenShell CLI/gateway 0.1.8 (official archives verified
+against NVIDIA SHA-256 manifests), macOS arm64, Colima Docker Engine 29.5.2 and
+`python:3.13-slim`. The development h2a and Codex protocol fixture were built from
+`f7d09ee0db0f725b6f59aa0d1ae4c1be70bc665c` plus these example changes;
+no Rust runtime source changed. This was **real sandbox execution with fixture output**,
+not an upstream Codex/subscription call.
+
+The gateway and h2a listeners bound only to host loopback. Private temporary XDG
+and h2a directories isolated their state. Reverse SSH forwards exposed those same
+ports only on Colima VM loopback. The OpenShell profile allowed only the selected
+`host.openshell.internal` port and Python executables.
+
+- `python examples/openshell/main.py --local` completed a real sandbox request and
+  confirmed its cleanup. The key had a 20-minute TTL, one accepted request,
+  a 60-second request timeout and concurrency one.
+- Subsequent sandbox clients using the same provider route observed HTTP 429.
+  `h2a keys inspect` reported exactly one accepted request.
+- After `h2a keys revoke`, another sandbox client observed HTTP 401.
+- Profile, provider and sandbox inventories contained no task-owned resources.
+  The task gateway, h2a and SSH forwarding processes were stopped; temporary
+  credentials were removed. All eight pre-existing Docker containers remained.
+- The real CLI rejected the old 41-character generated sandbox name. The example
+  now generates names within OpenShell 0.1.8's 19-character limit, also exercised
+  by its fake-CLI tests.
+
+The quota and revocation probes used a small HTTP status-checking workload in the
+same Python image and provider lifecycle. They were local integration checks,
+not hosted CI. CI validates example commands, transport restrictions and lifecycle
+behavior with a fake OpenShell executable; it does not start an OpenShell gateway.
+The default authenticated installer flow and other runtimes were not exercised
+by this isolated gateway test.

@@ -64,6 +64,7 @@ suite without copying version numbers into documentation. These checks do not
 replay every setup/sign-in step or visit external documentation links.
 
 The optional live runner and manual hosted workflow produce sanitized timestamped
-reports. No real harness, E2B, Modal or OpenShell live verification is claimed for
-this change. OpenShell is executable on a configured trusted host; the hosted
+reports. No real harness, E2B or Modal live verification is claimed. A subsequent
+[OpenShell local integration](../docs/openshell-live.md#verification) exercised real
+sandboxes with fixture output, quota denial, revocation and cleanup. OpenShell is executable on a configured trusted host; the hosted
 workflow does not provision its gateway. See [testing and account setup](../docs/examples-testing.md).

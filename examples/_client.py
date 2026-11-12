@@ -9,10 +9,11 @@ import urllib.request
 PROMPT = "Write a three-bullet incident update for a checkout outage: cause unknown, rollback underway, next update in 15 minutes. Do not invent facts."
 
 
-def config(remote=False):
+def config(remote=False, openshell_local=False):
     base = os.environ.get("OPENAI_BASE_URL", "http://127.0.0.1:8787/v1").rstrip("/")
     url = urllib.parse.urlsplit(base)
-    local = url.scheme == "http" and url.hostname in ("127.0.0.1", "::1")
+    local_hosts = ("127.0.0.1", "::1") + (("host.openshell.internal",) if openshell_local else ())
+    local = url.scheme == "http" and url.hostname in local_hosts
     if (url.scheme != "https" and (remote or not local)) or not url.hostname:
         raise ValueError("Use HTTPS for remote clients, or literal loopback HTTP locally")
     if url.username or url.password or url.query or url.fragment or url.path != "/v1":
@@ -43,7 +44,7 @@ def require_text(value):
 
 
 def complete():
-    base, token, model = config()
+    base, token, model = config(openshell_local=os.environ.get("H2A_OPENSHELL_LOCAL") == "1")
     request = urllib.request.Request(base + "/chat/completions", data=json.dumps({
         "model": model, "messages": [{"role": "user", "content": PROMPT}]
     }).encode(), headers={"Content-Type": "application/json", "Authorization": "Bearer " + token})
