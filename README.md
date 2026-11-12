@@ -112,6 +112,9 @@ print(response.choices[0].message.content)
 
 See [JavaScript](examples/client.mjs) and [Python](examples/client.py) examples. SDK dependencies are needed by the example client, not by the gateway.
 
+[Runnable examples](examples/README.md): switch between harnesses, run LangGraph or
+the OpenAI Agents SDK, and connect Docker, OpenShell, E2B, or Modal clients.
+
 ## API and execution boundary
 
 Text chat completions, legacy completions, model listing, and SSE streaming are implemented. See [the API contract](docs/api.md) for supported fields and errors. This is a text-completion adapter; tool calling and the full OpenAI API are not implemented.
