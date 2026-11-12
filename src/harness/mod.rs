@@ -101,7 +101,7 @@ fn executable(path: &Path) -> bool {
         true
     }
 }
-fn resolve(path: &Path) -> Option<PathBuf> {
+pub(crate) fn resolve_executable(path: &Path) -> Option<PathBuf> {
     if path.components().count() > 1 || path.is_absolute() {
         return executable(path)
             .then(|| std::fs::canonicalize(path).ok())
@@ -133,7 +133,7 @@ impl Adapter {
         if config.binary.as_os_str().is_empty() {
             config.binary = PathBuf::from(config.provider.binary());
         }
-        config.binary = resolve(&config.binary).ok_or(Error::Spawn)?;
+        config.binary = resolve_executable(&config.binary).ok_or(Error::Spawn)?;
         if config.provider == Provider::IbmBob {
             let ext = config.bob_extension.as_ref().ok_or(Error::Spawn)?;
             if !ext.is_absolute() || !ext.join("extensions/bob.ts").is_file() {

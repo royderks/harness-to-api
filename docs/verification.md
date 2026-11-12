@@ -14,6 +14,39 @@ H2A_BIN="$PWD/bin/h2a" python3 scripts/check-init.py
 
 The Python and shell lifecycle checks run on Linux and macOS. CI runs Rust tests and native builds on Linux, macOS, and Windows. Cross-compilation does not prove execution on every target architecture.
 
+## Documentation and CI selection
+
+PRs that change only root Markdown files or Markdown under `docs/` run README link,
+command-reference and CI selection checks without compiling Rust. The four required
+check names still report results; native-check jobs report that no native build was
+needed. Other paths, empty/unknown diffs and changes to CI itself run the full checks.
+A failed diff calculation or documentation check fails the required checks.
+Feature branches run checks on PR events; pushes to `main` are also checked.
+
+```sh
+python3 scripts/check_readme.py
+python3 -m unittest discover -s scripts/ci_tests -v
+python3 scripts/check_readme.py --binary ./bin/h2a
+```
+
+The fast check reads the CLI's help literal without a toolchain. Native CI compares
+the README Commands table with built CLI help, excluding the repository-maintenance
+`factory` commands documented in the factory guide. Release verification repeats that
+comparison using the README and binary extracted from each archive, so missing or
+obsolete command rows prevent a draft release.
+
+## Installer checks
+
+```sh
+python3 -m unittest discover -s scripts/install_tests -v
+```
+
+The Unix tests use local archives and a mocked download boundary to check platform
+selection, repeat installation, checksum refusal, and terminal input after a pipe.
+The installer workflow also installs the published binary on native macOS, Linux,
+and Windows runners, checks its version, and tests Windows repeat installation and
+checksum refusal using Windows PowerShell 5.1. These checks use no provider accounts.
+
 ## Coverage
 
 - API authentication, model visibility, text completions, SSE, strict request validation, and sanitized errors.

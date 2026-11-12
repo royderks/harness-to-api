@@ -42,6 +42,9 @@ For a remote sandbox, use an existing reachable HTTPS endpoint; see [remote acce
 
 ## Record a real run
 
+These recording commands require a source checkout. The personal recording helper
+is not included in native release archives.
+
 ```sh
 python3 scripts/record-demo.py --output docs/assets/codex-demo --title 'Codex to an API' -- ./demo/run.sh
 python3 scripts/record-demo.py --output docs/assets/antigravity-demo --title 'Antigravity to an API' -- ./demo/run.sh --provider antigravity

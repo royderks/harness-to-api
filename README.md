@@ -2,50 +2,27 @@
 
 **Your coding harness. One OpenAI-compatible endpoint.**
 
-Run Codex, Antigravity, Gemini CLI, Claude Code, OpenCode, or IBM Bob through Pi behind an API key. Point an OpenAI client at it—from your laptop, a container, or a remote sandbox.
+Put your coding harness behind an API key. Point an OpenAI client at it—from your laptop, a container, or a remote sandbox.
 
-A single native Rust binary. End users do **not** need Rust, Node, or Python to run the gateway. Install and authenticate each harness CLI separately. IBM Bob uses the community `pi-bob` extension for Pi.
+A single native Rust binary. End users do **not** need Rust, Node, or Python to run the gateway. Install and authenticate each harness CLI separately.
 
 The project is **harness-to-api**; the executable is `h2a`.
 
-## Watch it work
+## Getting started
 
-[Runnable examples](examples/README.md): switch between harnesses, run LangGraph or
-the OpenAI Agents SDK, and connect Docker, OpenShell, E2B, or Modal clients.
+Install and start h2a:
 
-[Replay the offline demo](docs/assets/fixture-demo.html) · [terminal recording](docs/assets/fixture-demo.cast) · [transcript](docs/assets/fixture-demo.txt). It shows authentication, streaming and revocation with a canned harness response; no provider account is used. Download the HTML file to play it locally.
-
-Run a demo with temporary scoped keys, streamed responses, and revocation:
-
+**macOS / Linux**
 ```sh
-./demo/run.sh                           # real Codex; needs Rust, Python 3, and Codex login
-./demo/run.sh --provider antigravity     # real Antigravity; needs agy login
-H2A_BIN=./bin/h2a ./demo/run.sh           # use a prebuilt h2a; no Rust toolchain required
-./demo/run.sh --fixture                 # explicitly offline, no provider call
+curl -fsSL https://raw.githubusercontent.com/royderks/harness-to-api/main/install.sh | sh
 ```
 
-The demo cleans up its server and key store. Python uses only its standard library. See [demo instructions](docs/demo.md) for the OpenShell recipe and recording commands.
-
-## Start locally
-
-For local development, build from this checkout with Rust 1.89+:
-
-```sh
-cargo build --locked --bin h2a --example harness-fixture
-mkdir -p bin && cp target/debug/h2a bin/h2a
+**Windows (PowerShell)**
+```powershell
+irm https://raw.githubusercontent.com/royderks/harness-to-api/main/install.ps1 | iex
 ```
 
-Install the [official Codex CLI](https://learn.chatgpt.com/docs/cli), then sign in:
-
-```sh
-codex login
-```
-
-Start the foreground setup flow:
-
-```sh
-./bin/h2a init
-```
+The command installs h2a and asks which harness you want to use or add, marking the ones already installed. If needed, setup shows its installation and sign-in commands. Keep the terminal open while the gateway runs. No Rust needed. See [installation details](docs/distribution.md) for manual downloads and requirements.
 
 It shows the provider, endpoint, state location, and bounded key policy before setup. A live probe is a separate opt-in; setup alone does not make an inference request. The endpoint is unverified until a probe succeeds. Keep the process running and stop it with Ctrl+C. See [onboarding](docs/onboarding.md) for a client example, automation, and recovery.
 
@@ -54,7 +31,7 @@ The lower-level `keys create` and `serve` commands remain available; see the [CL
 Give a sandbox bounded access with an expiring key:
 
 ```sh
-export OPENAI_API_KEY="$(./bin/h2a keys create --name sandbox \
+export OPENAI_API_KEY="$(h2a keys create --name sandbox \
   --models 'codex/*' --ttl 1h --request-timeout 90s \
   --max-requests 20 --rate-limit 5/min --max-concurrent 1)"
 ```
@@ -68,35 +45,53 @@ curl http://127.0.0.1:8787/v1/chat/completions \
   -d '{"model":"codex/default","messages":[{"role":"user","content":"Explain a reverse proxy in one sentence."}],"stream":true}'
 ```
 
-`codex/default` uses the CLI's default model. Select a specific available model with `codex/<model-id>`. Codex user configuration is deliberately skipped; account login is retained. The Codex adapter requires a CLI supporting `--ignore-user-config`, `--ignore-rules`, and `--ephemeral` (validated against 0.165.0).
+## Commands
 
-## Antigravity
+<!-- commands:start -->
+| Command | Purpose |
+| --- | --- |
+| `h2a init` | Set up bounded local access and run the gateway in the foreground. |
+| `h2a init repair` | Discard an interrupted onboarding setup after identity checks and explicit confirmation. |
+| `h2a doctor` | Check installed harness and tunnel binaries; does not verify login. |
+| `h2a serve` | Start the API with existing keys and selected harnesses. |
+| `h2a probe` | Make a real completion request to verify access; consumes quota. |
+| `h2a share` | Print tunnel setup instructions; does not change networking. |
+| `h2a keys create` | Create a scoped key with optional expiry and limits; prints its secret once. |
+| `h2a keys list` | List stored key metadata without secrets. |
+| `h2a keys inspect` | Show a key's policy and durable usage. |
+| `h2a keys explain` | Check whether a model would be allowed by a key and supplied configuration. |
+| `h2a keys revoke` | Revoke a key and cancel its active managed requests. |
+| `h2a version` | Print the gateway version; also available as `h2a --version`. |
+| `h2a help` | Show usage; also available as `h2a --help` or `h2a -h`. |
+<!-- commands:end -->
 
-Install the [official Antigravity CLI](https://antigravity.google/docs/cli/tutorial/) and run `agy` interactively once to sign in. Then:
+For command flags, use commands such as `h2a help serve` or `h2a keys create --help`. See the [CLI guide](docs/cli.md) for full usage.
 
-```sh
-./bin/h2a keys create --name antigravity-client --models 'antigravity/*'
-./bin/h2a serve --provider antigravity
-```
+## Supported harnesses
 
-Use `antigravity/default` or `antigravity/<model-slug>`. Run `agy models` for your available models. `--provider codex,antigravity` enables both in one server. `--provider all` enables all six adapters and requires all CLIs plus the Bob extension. Keys can allow both using `--models 'codex/*,antigravity/*'`.
+Install and sign in to the harness you want to use. Select it with `--provider` and use its model prefix in API requests.
 
-The gateway invokes supported harness CLIs; the IBM integration uses the explicitly installed community Pi extension. It does not extract OAuth tokens or call private provider endpoints. Harness login, subscription access, model eligibility, and provider limits remain controlled by each provider. An h2a key protects this gateway; it is not an OpenAI, Google, or IBM provider key.
+| Harness | Provider | Example model | Setup |
+| --- | --- | --- | --- |
+| Codex | `codex` | `codex/default` | [Getting started](#getting-started) |
+| Antigravity | `antigravity` | `antigravity/default` | [CLI installation and login](https://antigravity.google/docs/cli/tutorial/) |
+| Gemini CLI | `gemini` | `gemini/default` | [Setup guide](docs/gemini.md) |
+| Claude Code | `claude` | `claude/default` | [Setup guide](docs/claude.md) |
+| OpenCode | `opencode` | `opencode/<provider>/<model-id>` | [Setup guide](docs/opencode.md) |
+| IBM Bob through Pi | `ibm-bob` | `ibm-bob/premium` | [Setup guide](docs/ibm-bob.md) |
 
-## IBM Bob through Pi
-
-IBM Bob is available as `--provider ibm-bob`, with models such as `ibm-bob/premium` or `ibm-bob/openai/gpt-oss-20b`. It uses [pi-bob](https://pi.dev/packages/pi-bob), a community Pi provider extension, not IBM's official Bob CLI. See [installation, login, and serving instructions](docs/ibm-bob.md). The adapter is tested against the Pi protocol; live IBM account inference has not been verified here.
-
-## Gemini CLI, Claude Code, and OpenCode
-
-See [Gemini CLI setup](docs/gemini.md), [Claude Code setup](docs/claude.md), and [OpenCode setup](docs/opencode.md) for installation, login, supported versions, execution restrictions, and compatibility notes.
+Enable multiple harnesses in one server and scope a key to them:
 
 ```sh
 h2a keys create --name mixed-client --models 'codex/*,gemini/*'
 h2a serve --provider codex,gemini
 ```
 
-Use `gemini/default`, `claude/default`, or an explicit model under that harness prefix. OpenCode model IDs include its upstream provider: `opencode/<provider>/<model-id>`. `/v1/models` lists the enabled aliases and your key's exact scopes; it does not discover account entitlements.
+`--provider all` enables all six adapters and requires their CLIs and extensions to be installed. `/default` uses the harness default, except `ibm-bob/default`, which selects `premium`. Select a specific model with its prefixed ID. Run `agy models` for available Antigravity model slugs. `/v1/models` lists configured aliases and key scopes; it does not discover account entitlements.
+
+Codex skips user configuration but retains account login. Its CLI must support `--ignore-user-config`, `--ignore-rules`, and `--ephemeral` (validated against 0.165.0). The linked guides cover other harness-specific requirements and verification limits.
+
+h2a invokes installed CLIs and extensions; it does not extract OAuth tokens or call private provider endpoints. Each provider controls login, subscription access, model eligibility, and limits. Gateway keys are separate from provider credentials.
 
 ## Use an OpenAI client
 
@@ -116,6 +111,9 @@ print(response.choices[0].message.content)
 ```
 
 See [JavaScript](examples/client.mjs) and [Python](examples/client.py) examples. SDK dependencies are needed by the example client, not by the gateway.
+
+[Runnable examples](examples/README.md): switch between harnesses, run LangGraph or
+the OpenAI Agents SDK, and connect Docker, OpenShell, E2B, or Modal clients.
 
 ## API and execution boundary
 
@@ -170,12 +168,19 @@ Keys and client environment secrets are excluded from the child environment. Off
 
 ## Develop and release
 
+For local development, build from this checkout with Rust 1.89+:
+
 ```sh
 cargo build --locked --bin h2a --example harness-fixture
+mkdir -p bin && cp target/debug/h2a bin/h2a
+```
+
+Run the offline checks, then optionally probe your running gateway:
+
+```sh
 H2A_HARNESS_FIXTURE="$PWD/target/debug/examples/harness-fixture" cargo test --locked --all-targets
 cargo clippy --locked --all-targets -- -D warnings
-mkdir -p bin && cp target/debug/h2a bin/h2a
-h2a probe --base-url http://127.0.0.1:8787/v1 --model codex/default
+./bin/h2a probe --base-url http://127.0.0.1:8787/v1 --model codex/default
 ```
 
 The probe makes one model call using your existing Codex login. Normal tests use subprocess protocol fixtures and never require credentials.
