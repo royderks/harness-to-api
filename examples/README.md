@@ -27,8 +27,8 @@ export H2A_BIN="$PWD/target/debug/h2a"  # or the absolute path to your installed
 ```
 
 For a source checkout, first run `cargo build --locked --bin h2a --example harness-fixture`.
-Each example also lists only the dependencies it needs, so installing the full
-requirements file is optional. The pinned versions are tested versions, not a claim
+Each example lists its client dependencies and uses the shared requirements file
+so its documented install command follows tested dependency updates. The pinned versions are tested versions, not a claim
 that every newer SDK version works.
 
 ## Start a bounded gateway

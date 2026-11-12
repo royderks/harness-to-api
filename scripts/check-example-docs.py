@@ -23,7 +23,7 @@ def check(root):
         errors.append(f'example directories and manifest differ: {sorted(directories ^ set(manifest))}')
     if {name for name, entry in manifest.items() if entry['offline']} != {'harness-switch', 'langgraph', 'agents-sdk'}:
         errors.append('offline examples must be the three local SDK clients')
-    requirements = set((examples / 'requirements.txt').read_text().splitlines())
+    requirements = {line.split('==')[0] for line in (examples / 'requirements.txt').read_text().splitlines() if '==' in line}
     for name, entry in manifest.items():
         readme = examples / name / 'README.md'
         if not readme.is_file():

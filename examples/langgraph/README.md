@@ -7,7 +7,7 @@ nodes so it sends only h2a's supported text fields.
 Follow [gateway setup](../README.md#start-a-bounded-gateway), then:
 
 ```sh
-python -m pip install langgraph==0.6.11 openai==3.49.0
+python -m pip install -r examples/requirements.txt
 export H2A_MODEL=codex/default
 export H2A_REVIEW_MODEL=gemini/default
 ```
@@ -24,3 +24,5 @@ automatic retry. Both stages print their output. No LangSmith account is require
 tracing is explicitly disabled. No local output files are created.
 
 Cleanup: use the shared gateway cleanup. [LangGraph graph API](https://docs.langchain.com/oss/python/langgraph/quickstart).
+
+Client dependencies: `langgraph`, `openai`. Versions are pinned in [the shared requirements](../requirements.txt).

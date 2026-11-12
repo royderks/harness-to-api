@@ -7,7 +7,7 @@ Prerequisites: [gateway and HTTPS route](../README.md#remote-sandboxes), a Modal
 account with available quota, and local Modal authentication:
 
 ```sh
-python -m pip install modal==1.2.6
+python -m pip install -r examples/requirements.txt
 modal setup
 export OPENAI_BASE_URL=https://YOUR-HOSTNAME/v1
 export H2A_MODEL=codex/default

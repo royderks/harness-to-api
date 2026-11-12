@@ -8,7 +8,7 @@ an E2B account with available quota, and `E2B_API_KEY` configured privately in y
 shell. Do not paste the key into a command or commit it.
 
 ```sh
-python -m pip install e2b==2.10.2
+python -m pip install -r examples/requirements.txt
 export OPENAI_BASE_URL=https://YOUR-HOSTNAME/v1
 export H2A_MODEL=codex/default
 # OPENAI_API_KEY: a dedicated h2a key; E2B_API_KEY: your E2B account key.

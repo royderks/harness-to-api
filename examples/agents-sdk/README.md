@@ -7,7 +7,7 @@ supported by h2a.
 Follow [gateway setup](../README.md#start-a-bounded-gateway), then:
 
 ```sh
-python -m pip install openai-agents==0.24.0 openai==3.49.0
+python -m pip install -r examples/requirements.txt
 export H2A_MODEL=codex/default
 ```
 
