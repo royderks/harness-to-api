@@ -30,7 +30,8 @@ python3 scripts/check_readme.py --binary ./bin/h2a
 ```
 
 The fast check reads the CLI's help literal without a toolchain. Native CI compares
-the README Commands table with built CLI help. Release verification repeats that
+the README Commands table with built CLI help, excluding the repository-maintenance
+`factory` commands documented in the factory guide. Release verification repeats that
 comparison using the README and binary extracted from each archive, so missing or
 obsolete command rows prevent a draft release.
 
