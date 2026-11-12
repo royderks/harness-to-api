@@ -88,17 +88,14 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 fn executable(path: &Path) -> bool {
     let Ok(m) = path.metadata() else { return false };
-    if !m.is_file() {
-        return false;
-    }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        m.permissions().mode() & 0o111 != 0
+        m.is_file() && m.permissions().mode() & 0o111 != 0
     }
     #[cfg(not(unix))]
     {
-        true
+        m.is_file()
     }
 }
 pub(crate) fn resolve_executable(path: &Path) -> Option<PathBuf> {
