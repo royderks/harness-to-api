@@ -56,7 +56,7 @@ def main():
             port = sock.getsockname()[1]
         server = subprocess.Popen([str(BIN), "serve", "--state-dir", str(state), "--provider", "codex", "--port", str(port), "--codex-bin", str(FIXTURE)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         proxy = None
-        names = root / "names"
+        ids = root / "container-ids"
         try:
             for _ in range(100):
                 if server.poll() is not None:
@@ -95,25 +95,62 @@ def main():
             thread = threading.Thread(target=proxy.serve_forever, daemon=True)
             thread.start()
 
-            # Record only generated container names; the real Docker executable receives the original argv.
+            # Observe Docker's cidfile while the real command runs, including on timeout.
             wrapper = root / "docker"
-            wrapper.write_text("#!/usr/bin/env python3\nimport os, sys\na = sys.argv[1:]\nif a and a[0] == 'run':\n with open(os.environ['H2A_TEST_NAMES'], 'a') as f: f.write(a[a.index('--name') + 1] + '\\n')\nos.execv(os.environ['H2A_TEST_DOCKER'], [os.environ['H2A_TEST_DOCKER'], *a])\n")
+            wrapper.write_text('''#!/usr/bin/env python3
+import os, pathlib, subprocess, sys, time
+args = sys.argv[1:]
+if not args or args[0] != "run":
+    os.execv(os.environ["H2A_TEST_DOCKER"], [os.environ["H2A_TEST_DOCKER"], *args])
+cidfile = pathlib.Path(args[args.index("--cidfile") + 1])
+proc = subprocess.Popen([os.environ["H2A_TEST_DOCKER"], *args])
+recorded = False
+deadline = time.monotonic() + 230
+while True:
+    try:
+        cid = cidfile.read_text().strip()
+    except FileNotFoundError:
+        cid = ""
+    if not recorded and len(cid) == 64 and all(c in "0123456789abcdef" for c in cid):
+        with open(os.environ["H2A_TEST_IDS"], "a") as f:
+            f.write(cid + "\\n")
+        recorded = True
+    result = proc.poll()
+    if result is not None:
+        sys.exit(result)
+    if time.monotonic() >= deadline:
+        proc.kill()
+        proc.wait()
+        sys.exit(124)
+    time.sleep(.05)
+''')
             wrapper.chmod(0o755)
-            env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ["PATH"], H2A_TEST_DOCKER=docker, H2A_TEST_NAMES=str(names), OPENAI_BASE_URL=f"https://{hostname}:{proxy.server_port}/v1", OPENAI_API_KEY=token, H2A_MODEL="codex/default", H2A_CA_CERT=str(cert))
+            env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ["PATH"], TMPDIR=str(root), H2A_TEST_DOCKER=docker, H2A_TEST_IDS=str(ids), OPENAI_BASE_URL=f"https://{hostname}:{proxy.server_port}/v1", OPENAI_API_KEY=token, H2A_MODEL="codex/default", H2A_CA_CERT=str(cert))
 
             def run_example(label, expected, status=None, ca=True):
                 run_env = env.copy()
                 if not ca:
                     run_env.pop("H2A_CA_CERT")
-                result = subprocess.run([sys.executable, str(ROOT / "examples/docker/main.py")], env=run_env, capture_output=True, text=True, timeout=260)
+                before = ids.read_text().splitlines() if ids.exists() else []
+                process = subprocess.Popen([sys.executable, str(ROOT / "examples/docker/main.py")], env=run_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+                try:
+                    stdout, stderr = process.communicate(timeout=260)
+                except subprocess.TimeoutExpired:
+                    os.killpg(process.pid, signal.SIGKILL)
+                    process.communicate()
+                    raise RuntimeError(label + " timed out")
+                result = subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
                 output = result.stdout + result.stderr
                 if token in output:
                     raise RuntimeError("Credential appeared in client output")
                 if result.returncode != expected or (status and status not in output):
                     raise RuntimeError(label + " failed (exit " + str(result.returncode) + "; expected output missing or exit differed)")
-                name = names.read_text().splitlines()[-1]
-                listing = command([docker, "ps", "-a", "--filter", "name=^/" + name + "$", "--format", "{{.Names}}"], capture_output=True, text=True).stdout.splitlines()
-                if name in listing:
+                recorded = ids.read_text().splitlines() if ids.exists() else []
+                if len(recorded) != len(before) + 1:
+                    raise RuntimeError(label + " did not record exactly one container ID")
+                container_id = recorded[-1]
+                listing = command([docker, "ps", "-a", "--no-trunc", "--filter", "id=" + container_id, "--format", "{{.ID}}"], capture_output=True, text=True).stdout.splitlines()
+                if container_id in listing:
                     raise RuntimeError(label + " left a container behind")
                 print("PASS " + label + "; container removed", flush=True)
 
@@ -126,13 +163,17 @@ def main():
             cli("keys", "revoke", token.split("_")[1])
             run_example("revocation HTTP 401", 1, "HTTP 401")
         finally:
-            if names.exists():
-                for name in names.read_text().splitlines():
-                    if name.startswith("h2a-example-") and len(name) == len("h2a-example-") + 12 and all(c in "0123456789abcdef" for c in name[12:]):
+            recorded_ids = ids.read_text().splitlines() if ids.exists() else []
+            # An interrupted example can leave its private cidfile behind.
+            for cidfile in root.glob("h2a-docker-*/container-id"):
+                recorded_ids.append(cidfile.read_text().strip())
+            if recorded_ids:
+                for container_id in set(recorded_ids):
+                    if len(container_id) == 64 and all(c in "0123456789abcdef" for c in container_id):
                         try:
-                            subprocess.run([docker, "rm", "-f", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
+                            subprocess.run([docker, "rm", "-f", container_id], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
                         except (OSError, subprocess.TimeoutExpired):
-                            print("ISSUE: could not clean up owned container " + name, file=sys.stderr)
+                            print("ISSUE: could not clean up owned container " + container_id, file=sys.stderr)
             if proxy:
                 proxy.shutdown()
                 proxy.server_close()
