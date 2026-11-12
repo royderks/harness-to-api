@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run the documented OpenShell route using task-owned names and a configured gateway."""
+import argparse
 import os
 from pathlib import Path
 import re
@@ -57,19 +58,22 @@ def cli(args, timeout):
 
 
 
-def main():
+def main(local=False):
     deadline = time.monotonic() + WORK_SECONDS
-    base, _, model = config(remote=True)
+    base, _, model = config(remote=not local, openshell_local=local)
     url = urllib.parse.urlsplit(base)
+    if local and (url.scheme != "http" or url.hostname != "host.openshell.internal"):
+        raise ValueError("Local mode requires http://host.openshell.internal:PORT/v1")
     if not re.fullmatch(r'[A-Za-z0-9.-]+', url.hostname):
         raise ValueError('OpenShell profile requires a DNS hostname')
-    name = 'h2a-live-' + uuid.uuid4().hex
+    name = 'h2a-' + uuid.uuid4().hex[:15]
+    print('OpenShell resource name: ' + name, file=sys.stderr, flush=True)
     marker = 'H2A_COMPLETION_' + uuid.uuid4().hex
     with tempfile.TemporaryDirectory(prefix='h2a-live-openshell-') as temp:
         profile = Path(temp) / 'provider.yaml'
         source = (ROOT / 'examples/openshell/h2a-provider.yaml').read_text()
         source = source.replace('h2a-demo', name).replace('h2a.example.com', url.hostname)
-        source = source.replace('port: 443', 'port: ' + str(url.port or 443))
+        source = source.replace('port: 443', 'port: ' + str(url.port or (80 if local else 443)))
         profile.write_text(source)
         profile.chmod(0o600)
 
@@ -77,7 +81,7 @@ def main():
             return cli(args, min(COMMAND_SECONDS, deadline - time.monotonic()))
 
         # Only delete successful creations or timed-out creations whose outcome
-        # is unknown. Random full UUID names keep uncertain outcomes task-scoped.
+        # is unknown. Random per-run names avoid reusing existing task identities.
         owned = []
         def create(resource, *args):
             try:
@@ -96,7 +100,9 @@ def main():
             try:
                 result = work('sandbox', 'create', '--name', name, '--from', 'python:3.13-slim',
                               '--provider', name, '--env', 'OPENAI_BASE_URL=' + base,
-                              '--env', 'H2A_MODEL=' + model, '--no-tty', '--', 'python3', '-c',
+                              '--env', 'H2A_MODEL=' + model,
+                              *(['--env', 'H2A_OPENSHELL_LOCAL=1'] if local else []),
+                              '--no-tty', '--', 'python3', '-c',
                               (ROOT / 'examples/_client.py').read_text() + '\nprint(' + repr(marker) + ')\n')
             except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
                 # The sandbox command also runs the client, so nonzero can
@@ -119,7 +125,9 @@ def main():
 
 if __name__ == '__main__':
     try:
-        main()
+        parser = argparse.ArgumentParser(description=__doc__)
+        parser.add_argument("--local", action="store_true", help="Use the trusted local OpenShell host route over HTTP")
+        main(local=parser.parse_args().local)
     except Exception:
         print('OpenShell live check failed; inspect task resources and gateway privately.', file=sys.stderr)
         sys.exit(1)

@@ -55,7 +55,9 @@
   },
   "openshell": {
     "commands": [
-      "python examples/openshell/main.py"
+      "python examples/openshell/main.py --local",
+      "python examples/openshell/main.py",
+      "openshell sandbox delete NAME_PRINTED_BY_THIS_RUN\nopenshell provider delete NAME_PRINTED_BY_THIS_RUN\nopenshell profile delete NAME_PRINTED_BY_THIS_RUN"
     ],
     "dependencies": [],
     "offline": false

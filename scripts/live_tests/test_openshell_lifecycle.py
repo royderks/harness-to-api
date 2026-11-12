@@ -28,6 +28,9 @@ if args[:2] == ['sandbox', 'delete'] and os.environ['FAKE_MODE'] == 'delete_time
     Path(os.environ['FAKE_READY']).write_text('ready')
     time.sleep(30)
 if args[:2] == ['sandbox', 'create']:
+    assert len(args[args.index('--name') + 1]) <= 19
+    if os.environ.get('FAKE_LOCAL') == '1':
+        assert 'H2A_OPENSHELL_LOCAL=1' in args
     mode = os.environ['FAKE_MODE']
     if mode == 'timeout':
         child = subprocess.Popen([sys.executable, '-c', "import time; from pathlib import Path; time.sleep(1.5); Path(" + repr(os.environ['FAKE_SURVIVED']) + ").write_text('alive')"])
@@ -43,20 +46,28 @@ if args[:2] == ['sandbox', 'create']:
 
 
 class OpenShellLifecycle(unittest.TestCase):
-    def invoke(self, mode):
+    def invoke(self, mode, local=False):
         with tempfile.TemporaryDirectory() as temp:
             temp = Path(temp)
             executable = temp / 'openshell'
             executable.write_text(FAKE)
             executable.chmod(0o755)
             env = dict(os.environ, PATH=str(temp) + os.pathsep + os.environ.get('PATH', ''),
-                       OPENAI_BASE_URL='https://example.invalid/v1', OPENAI_API_KEY='test-key',
+                       OPENAI_BASE_URL=('http://host.openshell.internal:8787/v1' if local else 'https://example.invalid/v1'), OPENAI_API_KEY='test-key',
+                       FAKE_LOCAL='1' if local else '0',
                        FAKE_LOG=str(temp / 'log'), FAKE_MODE=mode,
                        FAKE_SURVIVED=str(temp / 'survived'), FAKE_PID=str(temp / 'pid'),
                        FAKE_READY=str(temp / 'ready'))
+            diagnostics = io.StringIO()
             popen = subprocess.Popen
             target = ['sandbox', 'create' if mode == 'timeout' else 'delete']
             def start(argv, **kwargs):
+                self.assertRegex(diagnostics.getvalue(), r'^OpenShell resource name: h2a-[0-9a-f]{15}\n$')
+                self.assertNotIn('test-key', diagnostics.getvalue())
+                if argv[1:3] == ['sandbox', 'create']:
+                    self.assertIn(argv[argv.index('--name') + 1], diagnostics.getvalue())
+                if argv[2] == 'delete':
+                    self.assertIn(argv[3], diagnostics.getvalue())
                 process = popen(argv, **kwargs)
                 if mode in ('timeout', 'delete_timeout') and argv[1:3] == target:
                     wait = process.wait
@@ -73,12 +84,13 @@ class OpenShellLifecycle(unittest.TestCase):
                 return process
             with patch.dict(os.environ, env, clear=True), \
                  patch.object(openshell.subprocess, 'Popen', side_effect=start), \
-                 contextlib.redirect_stdout(io.StringIO()):
+                 contextlib.redirect_stdout(io.StringIO()), \
+                 contextlib.redirect_stderr(diagnostics):
                 if mode == 'success':
-                    openshell.main()
+                    openshell.main(local=local)
                 else:
                     with self.assertRaises((RuntimeError, subprocess.TimeoutExpired)):
-                        openshell.main()
+                        openshell.main(local=local)
             calls = (temp / 'log').read_text().splitlines()
             self.assertEqual(calls[-3:], ['sandbox delete', 'provider delete', 'profile delete'])
             if mode == 'timeout':
@@ -113,6 +125,9 @@ class OpenShellLifecycle(unittest.TestCase):
 
     def test_cleanup_continues_after_delete_timeout(self):
         self.invoke('delete_timeout')
+
+    def test_local_route_allows_success(self):
+        self.invoke('success', local=True)
 
     def test_completion_marker_allows_success(self):
         self.invoke('success')

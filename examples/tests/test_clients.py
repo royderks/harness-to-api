@@ -30,6 +30,27 @@ class Clients(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     config(remote=True)
 
+    def test_openshell_http_requires_explicit_local_route(self):
+        with patch.dict(os.environ, OPENAI_BASE_URL='http://host.openshell.internal:8787/v1'):
+            with self.assertRaises(ValueError):
+                config()
+            self.assertEqual(config(openshell_local=True)[0], 'http://host.openshell.internal:8787/v1')
+            with self.assertRaises(ValueError):
+                config(remote=True, openshell_local=True)
+        for base in ('http://public.example/v1', 'http://host.openshell.internal.evil/v1',
+                     'http://user:password@host.openshell.internal/v1'):
+            with patch.dict(os.environ, OPENAI_BASE_URL=base):
+                with self.assertRaises(ValueError):
+                    config(openshell_local=True)
+
+    def test_openshell_local_mode_rejects_other_hosts_before_cli(self):
+        module = load('openshell')
+        for base in ('https://gateway.example/v1', 'http://127.0.0.1:8787/v1'):
+            with patch.dict(os.environ, OPENAI_BASE_URL=base), patch.object(module, 'cli') as cli:
+                with self.assertRaises(ValueError):
+                    module.main(local=True)
+                cli.assert_not_called()
+
     def test_e2b_limits_injection_and_cleans_up_after_failure(self):
         module = load("e2b")
         sandbox = Mock()

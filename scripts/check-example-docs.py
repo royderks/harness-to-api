@@ -33,7 +33,10 @@ def check(root):
         expected = {name if len(entry['commands']) == 1 else f'{name}-{i+1}': command
                     for i, command in enumerate(entry['commands'])}
         for command in entry['commands']:
-            if command.startswith('python examples/') and (command != f'python examples/{name}/main.py' or not (examples / name / 'main.py').is_file()):
+            allowed_commands = {f'python examples/{name}/main.py'}
+            if name == 'openshell':
+                allowed_commands.add('python examples/openshell/main.py --local')
+            if command.startswith('python examples/') and (command not in allowed_commands or not (examples / name / 'main.py').is_file()):
                 errors.append(f'{name}: invalid Python launch command')
         blocks = BLOCK.findall(content)
         if len(blocks) != len(expected) or dict(blocks) != expected:
