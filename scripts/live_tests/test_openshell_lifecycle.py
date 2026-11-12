@@ -58,9 +58,16 @@ class OpenShellLifecycle(unittest.TestCase):
                        FAKE_LOG=str(temp / 'log'), FAKE_MODE=mode,
                        FAKE_SURVIVED=str(temp / 'survived'), FAKE_PID=str(temp / 'pid'),
                        FAKE_READY=str(temp / 'ready'))
+            diagnostics = io.StringIO()
             popen = subprocess.Popen
             target = ['sandbox', 'create' if mode == 'timeout' else 'delete']
             def start(argv, **kwargs):
+                self.assertRegex(diagnostics.getvalue(), r'^OpenShell resource name: h2a-[0-9a-f]{15}\n$')
+                self.assertNotIn('test-key', diagnostics.getvalue())
+                if argv[1:3] == ['sandbox', 'create']:
+                    self.assertIn(argv[argv.index('--name') + 1], diagnostics.getvalue())
+                if argv[2] == 'delete':
+                    self.assertIn(argv[3], diagnostics.getvalue())
                 process = popen(argv, **kwargs)
                 if mode in ('timeout', 'delete_timeout') and argv[1:3] == target:
                     wait = process.wait
@@ -77,7 +84,8 @@ class OpenShellLifecycle(unittest.TestCase):
                 return process
             with patch.dict(os.environ, env, clear=True), \
                  patch.object(openshell.subprocess, 'Popen', side_effect=start), \
-                 contextlib.redirect_stdout(io.StringIO()):
+                 contextlib.redirect_stdout(io.StringIO()), \
+                 contextlib.redirect_stderr(diagnostics):
                 if mode == 'success':
                     openshell.main(local=local)
                 else:

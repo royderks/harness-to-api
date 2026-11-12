@@ -48,10 +48,27 @@ export H2A_MODEL=codex/default
 ```
 
 `host.openshell.internal` is OpenShell's host route, not sandbox localhost. On a
-Docker VM such as Colima, VM loopback differs from macOS loopback. Follow the
-[local gateway and forwarding recipe](../../docs/openshell-live.md#configure-a-local-gateway)
-if that route cannot reach your loopback-bound h2a. Keep the port private; do not
-solve routing by exposing an unauthenticated gateway to your LAN.
+Docker VM such as Colima, VM loopback differs from macOS loopback. If that route
+cannot reach h2a, keep this forward running in another terminal on macOS:
+
+```sh
+ssh -F "$HOME/.colima/_lima/colima/ssh.config" \
+  -o ControlMaster=no -o ControlPath=none -o ExitOnForwardFailure=yes -N \
+  -R 127.0.0.1:8787:127.0.0.1:8787 lima-colima
+```
+
+This forwards the quickstart's h2a port 8787 to Colima VM loopback. If you change
+h2a's port, change both forwarding ports and `OPENAI_BASE_URL` together. If the
+sandbox supervisor also cannot reach your host-side OpenShell gateway, add a
+second `-R` before `lima-colima` for that gateway's actual port. For the default
+installer gateway on port 17670, use `-R 127.0.0.1:17670:127.0.0.1:17670`.
+Keep its existing TLS and authentication settings; do not replace its configuration.
+If a forward reports a port already in use, inspect the existing listener rather
+than stopping an unrelated service.
+
+The [advanced isolated-gateway recipe](../../docs/openshell-live.md#configure-a-local-gateway)
+uses separate example ports 18767 and 18768; those are not this quickstart's ports.
+Keep all forwards private; do not expose the gateway to your LAN.
 
 <!-- example-command: openshell-1 -->
 ```sh
@@ -89,8 +106,21 @@ fixture-backed h2a: completion, HTTP 429 after one accepted request, and HTTP 40
 after revocation passed. This is real sandbox/networking evidence with canned
 harness output, **not live Codex inference**. See [verification](../../docs/openshell-live.md#verification).
 
-Normal cleanup deletes only this run's profile, provider and sandbox. A forced
-kill or unavailable gateway can leave resources. Inspect the exact names from
-your run before deleting anything; never prune unrelated Docker resources.
+Before creating resources, the script prints `OpenShell resource name: h2a-...`
+to stderr. Save that name: the profile, provider and sandbox all use it. Normal
+cleanup deletes only this run's resources. A forced kill or unavailable gateway
+can leave resources. After checking the printed name against your gateway's
+inventory, remove only those leftovers:
+
+<!-- example-command: openshell-3 -->
+```sh
+openshell sandbox delete NAME_PRINTED_BY_THIS_RUN
+openshell provider delete NAME_PRINTED_BY_THIS_RUN
+openshell profile delete NAME_PRINTED_BY_THIS_RUN
+```
+<!-- /example-command -->
+
+An already-removed resource may report not found. Never prune unrelated Docker
+resources. Stop any SSH forward you started when finished.
 The [opt-in live runner](../../docs/examples-testing.md) supports the HTTPS route;
 its hosted workflow does not provision an OpenShell gateway.

@@ -67,6 +67,7 @@ def main(local=False):
     if not re.fullmatch(r'[A-Za-z0-9.-]+', url.hostname):
         raise ValueError('OpenShell profile requires a DNS hostname')
     name = 'h2a-' + uuid.uuid4().hex[:15]
+    print('OpenShell resource name: ' + name, file=sys.stderr, flush=True)
     marker = 'H2A_COMPLETION_' + uuid.uuid4().hex
     with tempfile.TemporaryDirectory(prefix='h2a-live-openshell-') as temp:
         profile = Path(temp) / 'provider.yaml'
