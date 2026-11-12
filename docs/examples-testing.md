@@ -87,10 +87,14 @@ covers the other six examples; it does not install or expose an OpenShell gatewa
 
 ## Evidence and last successful verification
 
-Each attempt writes `artifacts/live-example.json` with the checked example, source
-commit, SDK versions, time, and `passed`, `failed` or `not_run`. A passed report
+The local runner writes `artifacts/live-example.json` with the checked example,
+source commit, SDK versions, time, and `passed`, `failed`, `not_run` or `incomplete`.
+The hosted job initializes its report in runner temporary storage before checkout
+and dependency installation, so setup failures retain `not_run`. Once execution
+starts, an interrupted attempt retains `incomplete`. A passed report
 also records the model and `last_success_at`. Failed or unconfigured runs have no
-success timestamp. Reports omit endpoint URLs, keys, stdout, stderr and model
+success timestamp. A job that never starts, or loses its runner before artifact
+upload, can have no report; that means unknown, not success. Reports omit endpoint URLs, keys, stdout, stderr and model
 output. The gateway and provider CLI versions are not remotely introspected;
 operators must record those separately when diagnosing provider drift.
 

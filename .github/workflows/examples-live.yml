@@ -24,6 +24,22 @@ jobs:
     environment: examples-live
     timeout-minutes: 12
     steps:
+      - name: Record attempt before setup
+        env:
+          LIVE_EXAMPLE: ${{ inputs.example }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          python3 - <<'PYTHON'
+          from datetime import datetime, timezone
+          import json, os
+          from pathlib import Path
+          report = {"schema_version": 1, "example": os.environ["LIVE_EXAMPLE"],
+                    "checked_at": datetime.now(timezone.utc).isoformat(),
+                    "source_commit": os.environ["SOURCE_COMMIT"], "sdk_versions": {},
+                    "status": "not_run", "reason": "Workflow setup did not complete",
+                    "last_success_at": None}
+          (Path(os.environ["RUNNER_TEMP"]) / "h2a-live-example.json").write_text(json.dumps(report, indent=2) + "\n")
+          PYTHON
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.sha }}
@@ -42,20 +58,23 @@ jobs:
           E2B_API_KEY: ${{ secrets.E2B_API_KEY }}
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
-        run: python scripts/check-live-example.py --allow-live --example "$LIVE_EXAMPLE"
+        run: python scripts/check-live-example.py --allow-live --example "$LIVE_EXAMPLE" --report "$RUNNER_TEMP/h2a-live-example.json"
       - name: Preserve sanitized verification evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: live-example-${{ inputs.example }}-${{ github.run_id }}
-          path: artifacts/live-example.json
-          if-no-files-found: warn
+          path: ${{ runner.temp }}/h2a-live-example.json
+          if-no-files-found: error
           retention-days: 90
       - name: Summarize result
         if: always()
         run: |
-          if test -f artifacts/live-example.json; then
+          if test -f "$RUNNER_TEMP/h2a-live-example.json"; then
             printf '```json\n' >> "$GITHUB_STEP_SUMMARY"
-            cat artifacts/live-example.json >> "$GITHUB_STEP_SUMMARY"
+            cat "$RUNNER_TEMP/h2a-live-example.json" >> "$GITHUB_STEP_SUMMARY"
             printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf 'No verification evidence was recorded; result is unknown.\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi

@@ -52,7 +52,10 @@ On macOS with Docker Desktop's Linux/aarch64 VM, the actual Docker example passe
 through an ephemeral HTTPS proxy to h2a and a canned Codex subprocess. The smoke
 proved rejection of an untrusted certificate, successful completion with the
 scoped test CA, exactly one debit, quota 429, revocation 401 and container cleanup.
-The public Python image remains cached. Native Linux execution is delegated to CI.
+The public Python image remains cached. The same test passed on native Linux
+in [CI run 43303265111](https://github.com/royderks/harness-to-api/actions/runs/43303265111)
+at `f04c88d45b62c2b532b67dc6f0dd4b603bdfd2fc`. Later cleanup and live-evidence
+fixes passed local checks; their current-head hosted result must be checked separately.
 
 All seven README launch commands and local links are now checked. The three SDK
 examples execute their documented commands in the offline runner. Install commands

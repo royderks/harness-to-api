@@ -47,6 +47,9 @@ def check(root):
     for readme in examples.rglob('README.md'):
         content = readme.read_text()
         outside_blocks = BLOCK.sub('', content)
+        for dependency in requirements:
+            if re.search(r'(?<![\w-])' + re.escape(dependency) + r'\s*(?:==|~=|>=|<=|>|<|!=)\s*[0-9]', content):
+                errors.append(f'{readme.relative_to(root)}: dependency pin must come from examples/requirements.txt: {dependency}')
         if re.search(r'^openshell (?:profile|provider|sandbox) ', outside_blocks, re.M):
             errors.append(f'{readme.relative_to(root)}: OpenShell command outside checked block')
         for command in re.findall(r'^python examples/[\w-]+/main\.py(?:[^\n]*)$', content, re.M):

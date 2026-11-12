@@ -41,6 +41,14 @@ class ExampleDocs(unittest.TestCase):
         path.write_text(path.read_text().replace('e2b==2.10.2', 'e2b==2.10.3'))
         self.assertEqual(checker.check(self.root), [])
 
+    def test_inline_dependency_pin_fails_after_version_bump(self):
+        requirements = self.root / 'examples/requirements.txt'
+        requirements.write_text(requirements.read_text().replace('openai==3.49.0', 'openai==3.50.0'))
+        self.assertEqual(checker.check(self.root), [])
+        path = self.root / 'examples/harness-switch/README.md'
+        path.write_text(path.read_text() + '\nInstall `openai==3.49.0` in your environment.\n')
+        self.assertTrue(any('dependency pin' in error for error in checker.check(self.root)))
+
     def test_dependency_drift_fails(self):
         path = self.root / 'examples/requirements.txt'
         path.write_text(path.read_text().replace('e2b==2.10.2', ''))

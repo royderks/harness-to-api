@@ -5,7 +5,7 @@ from pathlib import Path
 os.environ["LANGSMITH_TRACING"] = "false"
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from _client import PROMPT, config, run, sdk_client
+from _client import PROMPT, config, require_text, run, sdk_client
 from langgraph.graph import StateGraph, START, END
 from typing_extensions import TypedDict
 
@@ -20,7 +20,7 @@ def main():
     reviewer = os.environ.get("H2A_REVIEW_MODEL", model)
     with sdk_client() as client:
         def ask(selected, prompt):
-            return client.chat.completions.create(model=selected, messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+            return require_text(client.chat.completions.create(model=selected, messages=[{"role": "user", "content": prompt}]).choices[0].message.content)
 
         def draft(state):
             text = ask(model, PROMPT)

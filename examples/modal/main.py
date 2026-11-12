@@ -2,7 +2,7 @@
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from _client import config, run
+from _client import config, require_text, run
 import modal
 
 
@@ -19,7 +19,7 @@ def main():
             sandbox.wait()
             if sandbox.returncode != 0:
                 raise RuntimeError("Sandbox workload failed")
-            print(sandbox.stdout.read())
+            print(require_text(sandbox.stdout.read()))
         finally:
             sandbox.terminate()
             print("Modal sandbox stopped.")

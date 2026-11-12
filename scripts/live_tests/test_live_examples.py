@@ -6,14 +6,15 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import textwrap
 import unittest
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def load(name):
-    path = ROOT / 'examples/openshell/main.py' if name == 'live-openshell' else ROOT / 'scripts' / (name + '.py')
+    path = ROOT / 'scripts' / (name + '.py')
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -21,7 +22,6 @@ def load(name):
 
 
 live = load('check-live-example')
-openshell = load('live-openshell')
 
 
 class LiveChecks(unittest.TestCase):
@@ -80,21 +80,31 @@ class LiveChecks(unittest.TestCase):
                     live.run_check('e2b', env)
                 run.assert_not_called()
 
-    def test_openshell_cleanup_continues_after_delete_timeout(self):
-        calls = []
-        def command(argv, **kwargs):
-            calls.append(argv)
-            if argv[1:3] == ['sandbox', 'delete']:
-                raise subprocess.TimeoutExpired(argv, 30)
-            return Mock(returncode=0, stdout=b'assistant response')
-        with patch.dict(os.environ, self.env(), clear=True), patch.object(openshell.subprocess, 'run', side_effect=command):
-            with self.assertRaises(RuntimeError):
-                openshell.main()
-        self.assertEqual([c[1] for c in calls if c[2] == 'delete'], ['sandbox', 'provider', 'profile'])
-        self.assertNotIn('private-key', str(calls))
-        names = {c[3] for c in calls if c[2] == 'delete'}
-        self.assertEqual(len(names), 1)
-        self.assertTrue(next(iter(names)).startswith('h2a-live-'))
+    def test_interrupt_retains_incomplete_evidence(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, self.env(), clear=True):
+            path = Path(temp) / 'result.json'
+            with patch.object(live, 'run_check', side_effect=KeyboardInterrupt):
+                with self.assertRaises(KeyboardInterrupt):
+                    live.main(['--example', 'e2b', '--allow-live', '--report', str(path)])
+            report = json.loads(path.read_text())
+            self.assertEqual(report['status'], 'incomplete')
+            self.assertIsNone(report['last_success_at'])
+
+    def test_workflow_records_not_run_before_checkout(self):
+        workflow = (ROOT / '.github/workflows/examples-live.yml').read_text()
+        start = workflow.index('      - name: Record attempt before setup')
+        end = workflow.index('      - uses: actions/checkout', start)
+        block = workflow[start:end].split('        run: |\n', 1)[1]
+        with tempfile.TemporaryDirectory() as temp:
+            env = dict(os.environ, RUNNER_TEMP=temp, LIVE_EXAMPLE='e2b', SOURCE_COMMIT='a' * 40,
+                       OPENAI_API_KEY='must-not-appear')
+            subprocess.run(['bash', '-eu', '-c', textwrap.dedent(block)], env=env, check=True)
+            text = (Path(temp) / 'h2a-live-example.json').read_text()
+            report = json.loads(text)
+            self.assertEqual(report['status'], 'not_run')
+            self.assertEqual(report['source_commit'], 'a' * 40)
+            self.assertIsNone(report['last_success_at'])
+            self.assertNotIn('must-not-appear', text)
 
 
 if __name__ == '__main__':

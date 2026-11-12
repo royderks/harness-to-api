@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 os.environ["OPENAI_AGENTS_DISABLE_TRACING"] = "1"
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from _client import PROMPT, config, run
+from _client import PROMPT, config, require_text, run
 import httpx
 from openai import AsyncOpenAI
 from agents import Agent, Runner, OpenAIChatCompletionsModel, ModelSettings, set_tracing_disabled
@@ -20,7 +20,7 @@ async def demo():
                       model=OpenAIChatCompletionsModel(model=model, openai_client=client),
                       model_settings=ModelSettings(), tools=[])
         result = await Runner.run(agent, PROMPT, max_turns=1)
-        print(result.final_output)
+        print(require_text(result.final_output))
 
 
 if __name__ == "__main__":

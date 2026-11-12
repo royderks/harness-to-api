@@ -36,6 +36,12 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+def require_text(value):
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("Completion contained no text")
+    return value
+
+
 def complete():
     base, token, model = config()
     request = urllib.request.Request(base + "/chat/completions", data=json.dumps({
@@ -44,7 +50,7 @@ def complete():
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
     with opener.open(request, timeout=150) as response:
         result = json.load(response)
-    print(result["choices"][0]["message"]["content"])
+    print(require_text(result["choices"][0]["message"]["content"]))
 
 
 def run(main):

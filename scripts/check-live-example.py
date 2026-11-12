@@ -55,6 +55,11 @@ def run_check(example, env):
         raise RuntimeError('Example failed')
 
 
+def save_report(path, report):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2) + "\n")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--example', choices=EXAMPLES, required=True)
@@ -70,8 +75,12 @@ def main(argv=None):
         if missing:
             report['reason'] = 'Missing prerequisites: ' + ', '.join(missing)
         else:
+            report['status'] = 'incomplete'
+            report['reason'] = 'Execution started but no final result was recorded'
+            save_report(args.report, report)
             try:
                 run_check(args.example, os.environ)
+                report.pop('reason', None)
                 report['model'] = os.environ['H2A_MODEL']
                 report['status'] = 'passed'
                 report['last_success_at'] = datetime.now(timezone.utc).isoformat()
@@ -80,8 +89,7 @@ def main(argv=None):
                 report['status'] = 'failed'
                 report['reason'] = 'Live check failed; inspect configuration and quota privately'
                 code = 1
-    args.report.parent.mkdir(parents=True, exist_ok=True)
-    args.report.write_text(json.dumps(report, indent=2) + '\n')
+    save_report(args.report, report)
     print(json.dumps(report))
     return code
 
