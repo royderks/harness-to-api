@@ -46,12 +46,39 @@ class CompletionValidation(unittest.TestCase):
         module = load('harness-switch')
         for content in (None, '', ' \n'):
             client, stream = MagicMock(), MagicMock()
-            stream.__enter__.return_value = [SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=content))])]
+            stream.__enter__.return_value = [SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=content), finish_reason="stop")])]
             client.chat.completions.create.return_value = stream
             with patch.object(module, 'sdk_client') as factory:
                 factory.return_value.__enter__.return_value = client
                 with self.assertRaises(ValueError):
                     module.main()
+
+    def test_real_sdk_requires_terminal_stop_event(self):
+        import httpx
+        from openai import OpenAI
+        module = load('harness-switch')
+        def event(content, finish):
+            return 'data: ' + json.dumps({
+                'id': 'chatcmpl-test', 'object': 'chat.completion.chunk',
+                'created': 1, 'model': 'codex/default',
+                'choices': [{'index': 0, 'delta': {'content': content}, 'finish_reason': finish}]
+            }) + '\n\n'
+        partial = event('partial answer', None)
+        for ending, succeeds in (('', False), ('data: [DONE]\n\n', False),
+                                 (event('', 'length'), False),
+                                 (event('', 'content_filter'), False),
+                                 (event('', 'stop') + 'data: [DONE]\n\n', True)):
+            with self.subTest(ending=ending):
+                transport = httpx.MockTransport(lambda req: httpx.Response(
+                    200, headers={'content-type': 'text/event-stream'}, content=partial + ending))
+                client = OpenAI(base_url='https://example.invalid/v1', api_key='test-token',
+                                http_client=httpx.Client(transport=transport))
+                with patch.object(module, 'sdk_client', return_value=client):
+                    if succeeds:
+                        module.main()
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, 'Stream did not finish'):
+                            module.main()
 
     def test_graph_requires_text_from_both_nodes(self):
         module = load('langgraph')

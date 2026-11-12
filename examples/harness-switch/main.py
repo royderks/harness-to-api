@@ -13,13 +13,19 @@ def main():
             model = model.strip()
             print("\n--- " + model + " ---", flush=True)
             parts = []
+            finish_reason = None
             with client.chat.completions.create(model=model, messages=[{"role": "user", "content": PROMPT}], stream=True) as stream:
                 for chunk in stream:
                     if chunk.choices:
-                        text = chunk.choices[0].delta.content or ""
+                        choice = chunk.choices[0]
+                        if choice.finish_reason is not None:
+                            finish_reason = choice.finish_reason
+                        text = choice.delta.content or ""
                         parts.append(text)
                         print(text, end="", flush=True)
             require_text("".join(parts))
+            if finish_reason != "stop":
+                raise RuntimeError("Stream did not finish successfully")
             print()
 
 
