@@ -12,12 +12,12 @@ args = parser.parse_args()
 if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+', args.version):
     parser.error('version must be a stable vMAJOR.MINOR.PATCH')
 args.output.mkdir(parents=True, exist_ok=True)
-for name, old, new in (
-    ('install.sh', '    version=v0.1.0', '    version=' + args.version),
-    ('install.ps1', "    $version = 'v0.1.0'", "    $version = '" + args.version + "'"),
+for name, pattern in (
+    ('install.sh', rb"(?m)^(    version=)v[0-9]+\.[0-9]+\.[0-9]+(\r?)$"),
+    ('install.ps1', rb"(?m)^(    \$version = ')v[0-9]+\.[0-9]+\.[0-9]+('\r?)$"),
 ):
     source = (args.source / name).read_bytes()
-    old, new = old.encode(), new.encode()
-    if source.count(old) != 1:
+    staged, count = re.subn(pattern, lambda match: match[1] + args.version.encode() + match[2], source)
+    if count != 1:
         raise ValueError(name + ': expected exactly one public version assignment')
-    (args.output / name).write_bytes(source.replace(old, new, 1))
+    (args.output / name).write_bytes(staged)

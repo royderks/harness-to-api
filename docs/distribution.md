@@ -12,11 +12,10 @@ The [README quickstart](../README.md#getting-started) runs the repository's
 [Unix installer](../install.sh) or [Windows installer](../install.ps1). Each selects
 x86-64 or ARM64, downloads the published **v0.1.0** archive over HTTPS, verifies its
 SHA-256 checksum, and installs only the executable into `$HOME/.local/bin`.
-It then starts `h2a init` in the foreground, which detects installed harnesses and
-walks through setup. The installed-harness chooser in current source is planned
-for the next patch; the published v0.1.0 binary predates it. Installation needs no
-administrator privileges and does not
-access harness credentials.
+It then starts `h2a init` in the foreground for setup. The installed-harness chooser
+in current source is planned for the next patch; the published v0.1.0 binary
+predates it. Installation needs no administrator privileges and does not access
+harness credentials.
 Stop a running gateway before replacing its binary.
 
 The Unix command needs `curl`, `tar`, and `sha256sum` or `shasum`. Windows needs
