@@ -1,0 +1,11 @@
+# v0.1.1 release candidate
+
+Issue [#42](https://github.com/royderks/harness-to-api/issues/42) prepares a patch; it does not authorize publication. The coordinator must select the final source after independent review of #41 and #43, rebuild it, and obtain six passing native release jobs on that exact commit. Each `build_*.txt` records the source commit and toolchain; each `verification_*.json` records the extracted archive checks. CI artifacts also contain the staged installer scripts tested with the matching archive. PR artifacts and local builds are candidates, not published assets.
+
+Candidate notes: the patch adds one-command installers, an installed-harness chooser and missing-harness guidance, and tested SDK and sandbox examples. Offline fixtures do not prove live provider access. Binaries are unsigned; Linux requires a compatible glibc. Windows direct-child cancellation and the remaining platform limitations are described in [architecture](architecture.md). Windows candidate CI tests installation and refusal paths, but does not exercise the interactive chooser in a native terminal. Homebrew, npm, and Windows package managers remain separate follow-ups under #13.
+
+## Publication handoff
+
+1. After selecting and committing the final source, run the release workflow on that exact head and review all six native results, archive checksums, build metadata, and installer checks. Download and inspect the resulting bytes. Resolve any failures and obtain independent review.
+2. Obtain separate owner authorization before creating a tag or draft release, publishing assets, or switching public installer defaults. Follow the release workflow and verify the attached bytes before publishing; do not replace assets of an existing release.
+3. Once v0.1.1 is actually published, prepare a separate reviewed change to `install.sh` and `install.ps1`: replace their single `v0.1.0` version assignment with `v0.1.1`. The staged scripts in each candidate artifact show this exact patch. Update the public v0.1.0 installation instructions and published-binary smoke expectations in the same change, then run installer checks against the published assets. Until then, root installers and quickstart continue to target v0.1.0.

@@ -145,3 +145,7 @@ Do not replace assets under an already published version; publish a new patch ve
 
 Homebrew, npm and Windows package managers remain separate work under
 [issue #13](https://github.com/royderks/harness-to-api/issues/13). No registry package is published yet.
+
+For the unpublished v0.1.1 candidate, evidence and the separate publication
+handoff are in [release candidate](release-candidate.md). Public installers remain
+on v0.1.0 until the new release is published.

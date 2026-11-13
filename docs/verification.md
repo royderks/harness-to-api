@@ -108,3 +108,9 @@ Offline fixtures cover all six provider protocols. Successful fixture tests do n
 The Docker recipe, public tunnels, and managed cloud deployments require end-to-end validation on the chosen host. Test streaming, timeouts, login persistence, restart recovery, and revocation before relying on a deployment.
 
 Windows cancellation currently targets the direct CLI child, not its descendants. The POSIX CLI integration scripts do not validate Windows signal handling. Storage tests do not simulate every power-loss ordering. See [operational limits](architecture.md#operational-limits).
+
+Release PR jobs additionally stage version-switched installer copies from the
+committed source and install the matching candidate archive at a mocked download
+boundary. Unix runs the installed binary through the offline PTY init checks;
+Windows checks installed version, repeat installation, and checksum/download
+refusal, but does not prove the interactive chooser in a Windows terminal.
