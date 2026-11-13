@@ -1,5 +1,6 @@
 """Regression tests for the executable example documentation contract."""
 import importlib.util
+import re
 from pathlib import Path
 import shutil
 import tempfile
@@ -19,6 +20,32 @@ class ExampleDocs(unittest.TestCase):
         shutil.copytree(ROOT / 'examples', self.root / 'examples')
         shutil.copytree(ROOT / 'docs', self.root / 'docs')
 
+    def dependency_pin(self, name):
+        requirements = self.root / 'examples/requirements.txt'
+        matches = re.findall(rf'(?m)^{re.escape(name)}==([^\s]+)$', requirements.read_text())
+        self.assertEqual(len(matches), 1, f'expected one pin for {name}')
+        return f'{name}=={matches[0]}'
+
+    def replace_pin(self, name, replacement):
+        path = self.root / 'examples/requirements.txt'
+        pin = self.dependency_pin(name)
+        updated, count = re.subn(rf'(?m)^{re.escape(pin)}$', lambda _: replacement, path.read_text())
+        self.assertEqual(count, 1, f'expected one replacement for {name}')
+        path.write_text(updated)
+        return pin
+
+    def test_pin_mutation_ignores_comments(self):
+        path = self.root / 'examples/requirements.txt'
+        pin = self.dependency_pin('e2b')
+        comment = f'# Earlier pin: {pin}\n'
+        path.write_text(comment + path.read_text())
+        self.replace_pin('e2b', pin + '.1')
+        self.assertTrue(path.read_text().startswith(comment))
+        self.assertEqual(self.dependency_pin('e2b'), pin + '.1')
+        self.replace_pin('e2b', '')
+        self.assertTrue(path.read_text().startswith(comment))
+        self.assertFalse(re.search(r'(?m)^e2b==', path.read_text()))
+
     def test_current_docs_pass(self):
         self.assertEqual(checker.check(self.root), [])
 
@@ -37,21 +64,20 @@ class ExampleDocs(unittest.TestCase):
         self.assertTrue(any('invalid link' in error for error in checker.check(self.root)))
 
     def test_version_updates_keep_documented_install_commands_valid(self):
-        path = self.root / 'examples/requirements.txt'
-        path.write_text(path.read_text().replace('e2b==2.10.2', 'e2b==2.10.3'))
+        pin = self.dependency_pin('e2b')
+        self.replace_pin('e2b', pin + '.1')
         self.assertEqual(checker.check(self.root), [])
 
     def test_inline_dependency_pin_fails_after_version_bump(self):
-        requirements = self.root / 'examples/requirements.txt'
-        requirements.write_text(requirements.read_text().replace('openai==3.49.0', 'openai==3.50.0'))
+        pin = self.dependency_pin('openai')
+        self.replace_pin('openai', pin + '.1')
         self.assertEqual(checker.check(self.root), [])
         path = self.root / 'examples/harness-switch/README.md'
-        path.write_text(path.read_text() + '\nInstall `openai==3.49.0` in your environment.\n')
+        path.write_text(path.read_text() + f'\nInstall `{pin}` in your environment.\n')
         self.assertTrue(any('dependency pin' in error for error in checker.check(self.root)))
 
     def test_dependency_drift_fails(self):
-        path = self.root / 'examples/requirements.txt'
-        path.write_text(path.read_text().replace('e2b==2.10.2', ''))
+        self.replace_pin('e2b', '')
         self.assertTrue(any('dependency' in error for error in checker.check(self.root)))
 
 
