@@ -17,7 +17,7 @@ The Python and shell lifecycle checks run on Linux and macOS. CI runs Rust tests
 The local Unix socket-pressure regression uses synthetic state and loopback sockets, including a server with a 32-descriptor limit. It checks the 128-connection cap, recovery and cancellation under pressure:
 
 ```sh
-python3 scripts/check-connection-pressure.py
+H2A_FIXTURE="$PWD/target/debug/examples/harness-fixture" python3 scripts/check-connection-pressure.py
 ```
 
 This test does not contact a provider or demonstrate resistance to arbitrary traffic.

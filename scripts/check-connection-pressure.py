@@ -14,7 +14,8 @@ except ImportError:
     print('SKIP: resource limits unavailable')
     raise SystemExit(0)
 
-binary = str(Path(os.environ.get('H2A_BIN', 'target/debug/h2a')).resolve())
+binary = str(Path(os.environ.get('H2A_BIN', 'target/debug/h2a')).resolve(strict=True))
+fixture = str(Path(os.environ.get('H2A_FIXTURE', 'target/debug/examples/harness-fixture')).resolve(strict=True))
 
 
 def health(port, timeout=1):
@@ -33,7 +34,8 @@ def run(limit, count, cap=False, cancel=False):
             port = probe.getsockname()[1]
         def set_limit():
             resource.setrlimit(resource.RLIMIT_NOFILE, (limit, limit))
-        server = subprocess.Popen([binary, 'serve', '--state-dir', state, '--port', str(port)],
+        server = subprocess.Popen([binary, 'serve', '--state-dir', state, '--port', str(port),
+                                   '--codex-bin', fixture],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                   preexec_fn=set_limit)
         sockets = []
