@@ -29,8 +29,22 @@ class ExampleDocs(unittest.TestCase):
     def replace_pin(self, name, replacement):
         path = self.root / 'examples/requirements.txt'
         pin = self.dependency_pin(name)
-        path.write_text(path.read_text().replace(pin, replacement, 1))
+        updated, count = re.subn(rf'(?m)^{re.escape(pin)}$', lambda _: replacement, path.read_text())
+        self.assertEqual(count, 1, f'expected one replacement for {name}')
+        path.write_text(updated)
         return pin
+
+    def test_pin_mutation_ignores_comments(self):
+        path = self.root / 'examples/requirements.txt'
+        pin = self.dependency_pin('e2b')
+        comment = f'# Earlier pin: {pin}\n'
+        path.write_text(comment + path.read_text())
+        self.replace_pin('e2b', pin + '.1')
+        self.assertTrue(path.read_text().startswith(comment))
+        self.assertEqual(self.dependency_pin('e2b'), pin + '.1')
+        self.replace_pin('e2b', '')
+        self.assertTrue(path.read_text().startswith(comment))
+        self.assertFalse(re.search(r'(?m)^e2b==', path.read_text()))
 
     def test_current_docs_pass(self):
         self.assertEqual(checker.check(self.root), [])
