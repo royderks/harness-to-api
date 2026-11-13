@@ -8,11 +8,12 @@ on:
       - 'scripts/release.sh'
       - 'scripts/check-release.py'
       - 'scripts/check_readme.py'
+      - 'scripts/check-example-docs.py'
       - 'docs/distribution.md'
 permissions:
   contents: read
 env:
-  RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.0' }}
+  RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.1' }}
 jobs:
   build:
     strategy:
