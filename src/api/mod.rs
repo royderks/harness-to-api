@@ -18,8 +18,40 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::{net::TcpListener, sync::mpsc};
+use tokio::{
+    net::TcpListener,
+    sync::{Semaphore, mpsc},
+};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
+
+// Bound idle sockets independently of admitted harness runs. Hosts need additional
+// descriptor headroom for state operations and subprocesses.
+const MAX_CONNECTIONS: usize = 128;
+const ACCEPT_RETRY_DELAY: Duration = Duration::from_millis(100);
+
+fn transient_accept_error(error: &std::io::Error) -> bool {
+    if matches!(
+        error.kind(),
+        std::io::ErrorKind::Interrupted
+            | std::io::ErrorKind::WouldBlock
+            | std::io::ErrorKind::ConnectionAborted
+            | std::io::ErrorKind::ConnectionReset
+    ) {
+        return true;
+    }
+    #[cfg(unix)]
+    if matches!(
+        error.raw_os_error(),
+        Some(libc::EMFILE | libc::ENFILE | libc::ENOBUFS | libc::ENOMEM)
+    ) {
+        return true;
+    }
+    #[cfg(windows)]
+    if matches!(error.raw_os_error(), Some(10024 | 10055)) {
+        return true;
+    }
+    false
+}
 
 pub struct Config {
     pub keys: auth::Store,
@@ -82,12 +114,24 @@ impl Server {
         shutdown: CancellationToken,
     ) -> anyhow::Result<()> {
         let connections = TaskTracker::new();
-        loop {
-            let accepted = tokio::select! { biased; _ = shutdown.cancelled() => break, accepted = listener.accept() => accepted };
-            let (stream, _) = accepted?;
+        let permits = Arc::new(Semaphore::new(MAX_CONNECTIONS));
+        let connection_shutdown = shutdown.child_token();
+        let result = loop {
+            let permit = tokio::select! { biased; _ = shutdown.cancelled() => break Ok(()), permit = permits.clone().acquire_owned() => permit.expect("semaphore remains open") };
+            let accepted = tokio::select! { biased; _ = shutdown.cancelled() => break Ok(()), accepted = listener.accept() => accepted };
+            let (stream, _) = match accepted {
+                Ok(connection) => connection,
+                Err(error) if transient_accept_error(&error) => {
+                    drop(permit);
+                    tokio::select! { biased; _ = shutdown.cancelled() => break Ok(()), _ = tokio::time::sleep(ACCEPT_RETRY_DELAY) => {} }
+                    continue;
+                }
+                Err(error) => break Err(error.into()),
+            };
             let server = self.clone();
-            let canceled = shutdown.child_token();
+            let canceled = connection_shutdown.child_token();
             connections.spawn(async move {
+                let _permit = permit;
                 let connection_cancel = canceled.clone();
                 let io = TokioIo::new(transport::Socket {
                     stream,
@@ -111,11 +155,12 @@ impl Server {
                 tokio::select! { _ = &mut connection => {}, _ = canceled.cancelled() => {} }
                 canceled.cancel();
             });
-        }
+        };
+        connection_shutdown.cancel();
         connections.close();
         connections.wait().await;
         self.close().await;
-        Ok(())
+        result
     }
     async fn handle(
         self: Arc<Self>,
@@ -515,5 +560,26 @@ mod forwarding_tests {
             }
         }
         assert_eq!(text, "firstlast");
+    }
+}
+
+#[cfg(test)]
+mod accept_tests {
+    use super::*;
+
+    #[test]
+    fn distinguishes_transient_and_fatal_accept_errors() {
+        assert!(transient_accept_error(&std::io::Error::from(
+            std::io::ErrorKind::ConnectionAborted
+        )));
+        assert!(!transient_accept_error(&std::io::Error::from(
+            std::io::ErrorKind::InvalidInput
+        )));
+        #[cfg(unix)]
+        for code in [libc::EMFILE, libc::ENFILE, libc::ENOBUFS, libc::ENOMEM] {
+            assert!(transient_accept_error(&std::io::Error::from_raw_os_error(
+                code
+            )));
+        }
     }
 }

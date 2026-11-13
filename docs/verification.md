@@ -14,6 +14,14 @@ H2A_BIN="$PWD/bin/h2a" python3 scripts/check-init.py
 
 The Python and shell lifecycle checks run on Linux and macOS. CI runs Rust tests and native builds on Linux, macOS, and Windows. Cross-compilation does not prove execution on every target architecture.
 
+The local Unix socket-pressure regression uses synthetic state and loopback sockets, including a server with a 32-descriptor limit. It checks the 128-connection cap, recovery and cancellation under pressure:
+
+```sh
+H2A_FIXTURE="$PWD/target/debug/examples/harness-fixture" python3 scripts/check-connection-pressure.py
+```
+
+This test does not contact a provider or demonstrate resistance to arbitrary traffic.
+
 ## Documentation and CI selection
 
 PRs that change only root Markdown files or Markdown under `docs/` run README link,

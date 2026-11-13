@@ -84,6 +84,7 @@ jobs:
         run: |
           ./demo/run.sh --fixture
           python3 scripts/check-policies.py
+          python3 scripts/check-connection-pressure.py
           python3 scripts/check-init.py
       - uses: actions/setup-python@v5
         if: needs.changes.outputs.build == 'true' && runner.os == 'Linux'
