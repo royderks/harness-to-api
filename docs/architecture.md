@@ -65,6 +65,8 @@ The independent design comparison also preferred the single-store design on inte
 
 ## Operational limits
 
+The HTTP listener holds at most 128 active connections, including idle and streaming connections, independently of harness admission. At capacity, connections wait in the OS listen backlog until a slot opens. Transient accept and resource-exhaustion errors retry with a 100 ms cancellation-aware delay; other accept errors terminate serving after cleanup. This fixed limit bounds gateway-owned sockets, not arbitrary denial-of-service traffic. Hosts need file-descriptor headroom for state operations and subprocesses; a lower OS limit can cause accept retries before the connection cap is reached.
+
 Use a private local filesystem with working file locks and atomic replacement. Separate state directories have separate quotas. Restoring old state can restore old counters; an administrator who controls the files controls the policy.
 
 Normal cancellation and graceful shutdown stop managed runs. A forcibly killed gateway can leave orphaned harness processes; check and stop those before treating a restarted server's concurrency limit as a cap on all machine activity. Windows subprocess cancellation currently targets the direct child, not an entire descendant process tree.
