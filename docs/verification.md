@@ -93,7 +93,7 @@ Factory tests use a fake GitHub CLI transport. They cover publication retries, a
 
 ## Provider checks
 
-Live checks consume provider access and gateway quota. Run them only with an authenticated account and a bounded allowance:
+Live checks consume provider access and gateway quota. Run them one provider at a time only after an authorized login, required project configuration, and a bounded request allowance are available. Create a one-request key with a short deadline (`--max-requests 1 --ttl 5m --request-timeout 30s --max-concurrent 1`), run `h2a probe`, inspect `accepted` and `remaining_requests` with `h2a keys inspect`, and revoke the key afterward. Gateway request caps constrain gateway admissions and runtime; they do not bound upstream provider dollar spend:
 
 ```sh
 h2a probe --base-url http://127.0.0.1:8787/v1 --model codex/default
@@ -101,11 +101,20 @@ h2a probe --base-url http://127.0.0.1:8787/v1 --model codex/default
 ./demo/run.sh --provider antigravity
 ```
 
+| Provider | Protocol fixture | Tested CLI version | Live account status in this checkout |
+| --- | --- | --- | --- |
+| `codex` | Passed | `codex-cli 0.165.0` (host), `0.166.0` (Docker image) | Verified with live completion, streaming, and revocation |
+| `antigravity` | Passed | `agy 1.4.12` | Verified with live completion, streaming, and revocation |
+| `gemini` | Passed | `gemini 0.26.0` | Blocked on `GOOGLE_CLOUD_PROJECT` / `GOOGLE_CLOUD_PROJECT_ID`; 1-request `h2a probe` on 2026-11-13 recorded `accepted: 1, remaining_requests: 0` and sanitized `http_status: 502` ([setup guide](gemini.md)) |
+| `claude` | Passed | `claude 2.1.317` (flag/protocol check) | Unverified live; CLI and `claude auth login` not configured on this host ([setup guide](claude.md)) |
+| `opencode` | Passed | `@opencode/cli 2.2.5` (protocol check) | Unverified live; CLI and `opencode auth login` not configured on this host ([setup guide](opencode.md)) |
+| `ibm-bob` | Passed | `pi 1.5.0` + `pi-bob 0.2.6` (Docker image) | Unverified live; requires an eligible IBM Bob SSO login in Pi ([setup guide](ibm-bob.md)) |
+
 Offline fixtures cover all six provider protocols. Successful fixture tests do not establish live account access or compatibility with every CLI release. Use the provider's setup guide and `h2a probe` to check your own account and model. OpenShell setup instructions are in [the sandbox guide](openshell-live.md).
 
 ## Deployment limits
 
-The Docker recipe, public tunnels, and managed cloud deployments require end-to-end validation on the chosen host. Test streaming, timeouts, login persistence, restart recovery, and revocation before relying on a deployment.
+The [Docker runtime recipe](docker.md#validate-a-deployment) has been validated offline for Compose configuration (`deploy/compose.yaml` and `deploy/compose.bob.yaml`), image build, non-root runtime layout, `/healthz`, `/v1/models` authentication, volume persistence across container recreation, key revocation, and task-owned project cleanup. Live provider sign-in, completion streaming, public tunnels, and managed cloud deployments still require end-to-end validation on the chosen host before relying on a deployment.
 
 Windows cancellation currently targets the direct CLI child, not its descendants. The POSIX CLI integration scripts do not validate Windows signal handling. Storage tests do not simulate every power-loss ordering. See [operational limits](architecture.md#operational-limits).
 
