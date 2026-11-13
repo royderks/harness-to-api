@@ -12,9 +12,10 @@ The [README quickstart](../README.md#getting-started) runs the repository's
 [Unix installer](../install.sh) or [Windows installer](../install.ps1). Each selects
 x86-64 or ARM64, downloads the published **v0.1.0** archive over HTTPS, verifies its
 SHA-256 checksum, and installs only the executable into `$HOME/.local/bin`.
-It then starts `h2a init` in the foreground, which detects installed harnesses and
-walks through setup. Installation needs no administrator privileges and does not
-access harness credentials.
+It then starts `h2a init` in the foreground for setup. The installed-harness chooser
+in current source is planned for the next patch; the published v0.1.0 binary
+predates it. Installation needs no administrator privileges and does not access
+harness credentials.
 Stop a running gateway before replacing its binary.
 
 The Unix command needs `curl`, `tar`, and `sha256sum` or `shasum`. Windows needs
@@ -133,7 +134,8 @@ target triple; its toolchain/linker must exist. Native verification rejects a
 runner with the wrong OS or architecture.
 
 The release workflow tests all six targets on matching native runners, extracts
-each final archive, checks its version/help and README command coverage, and exercises an offline authenticated
+each final archive, checks its version/help, README command coverage and packaged
+example documentation, and exercises an offline authenticated
 HTTP request, quota denial, durable count and revocation. No provider account is
 used. PRs touching release files run the same checks without publishing. An approved
 version tag creates a **draft** release only after all targets pass. Inspect the
@@ -142,3 +144,7 @@ Do not replace assets under an already published version; publish a new patch ve
 
 Homebrew, npm and Windows package managers remain separate work under
 [issue #13](https://github.com/royderks/harness-to-api/issues/13). No registry package is published yet.
+
+For the unpublished v0.1.1 candidate, evidence and the separate publication
+handoff are in [release candidate](release-candidate.md). Public installers remain
+on v0.1.0 until the new release is published.

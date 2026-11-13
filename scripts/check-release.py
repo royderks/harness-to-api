@@ -2,6 +2,7 @@
 """Check final archive bytes, then execute the extracted native binary offline."""
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -76,6 +77,11 @@ def main():
         if cli("version") != args.version or "Usage:" not in cli("help"):
             raise RuntimeError("Release version/help mismatch")
         check_commands((extracted / "README.md").read_text(), cli("help"))
+        spec = importlib.util.spec_from_file_location("packaged_example_docs", extracted / "scripts/check-example-docs.py")
+        example_docs = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(example_docs)
+        if example_docs.check(extracted):
+            raise RuntimeError("Packaged example commands, dependencies or links are invalid")
         state = root / "state"
         token = cli("keys", "create", "--state-dir", str(state), "--models", "codex/default", "--ttl", "5m", "--max-requests", "1")
         identifier = token.split("_")[1]
@@ -134,7 +140,7 @@ def main():
             log.seek(0)
             if token in log.read():
                 raise RuntimeError("Credential found in gateway logs")
-    evidence = {"version": args.version, "target": args.target, "system": platform.system(), "machine": machine, "archive": archive.name, "sha256": digest, "checks": ["checksum", "extract", "version", "help", "readme-command-reference", "missing-key-401", "fixture-completion", "quota-429", "durable-count", "revoked-key-401", "secret-free-logs"], "live_provider": False}
+    evidence = {"version": args.version, "target": args.target, "system": platform.system(), "machine": machine, "archive": archive.name, "sha256": digest, "checks": ["checksum", "extract", "version", "help", "readme-command-reference", "example-documentation", "missing-key-401", "fixture-completion", "quota-429", "durable-count", "revoked-key-401", "secret-free-logs"], "live_provider": False}
     (args.dist / f"verification_{args.version}_{name}.json").write_text(json.dumps(evidence, indent=2) + "\n")
     print("PASS " + name + ": extracted archive version, HTTP and bounded-key lifecycle")
 

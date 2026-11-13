@@ -36,10 +36,13 @@ fi
   cd "$snapshot"
   H2A_VERSION="$version" cargo build --target-dir "$repo/target" --locked --release --target "$target" --bin h2a
 )
+python3 "$snapshot/scripts/stage-installers.py" "$version" --source "$snapshot" --output "dist/candidate-installers"
 mkdir -p "$folder"
 cp "target/$target/release/$executable" "$folder/"
 cp "$snapshot/LICENSE" "$snapshot/README.md" "$snapshot/CONTRIBUTING.md" "$snapshot/install.sh" "$snapshot/install.ps1" "$folder/"
 cp -R "$snapshot/docs" "$snapshot/examples" "$folder/"
+mkdir -p "$folder/scripts"
+cp "$snapshot/scripts/check-example-docs.py" "$folder/scripts/"
 mkdir -p "$folder/demo"
 cp "$snapshot"/demo/*.py "$snapshot"/demo/*.sh "$folder/demo/"
 {
