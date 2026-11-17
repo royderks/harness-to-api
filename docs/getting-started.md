@@ -26,6 +26,7 @@ Choose Codex, accept `codex/default`, port `8787`, and the default state directo
 
 In **terminal 2**, run the following on macOS or Linux with Python 3. It reads the default credential file directly, without printing the key or placing it in an environment variable or command argument. If you chose a different state directory, model or port, use the values shown by init.
 
+<!-- quickstart-command: client -->
 ```sh
 python3 - <<'PYTHON'
 import json, pathlib, urllib.request
@@ -49,6 +50,7 @@ if choice.get('finish_reason') != 'stop' or not isinstance(text, str) or not tex
 print(text)
 PYTHON
 ```
+<!-- /quickstart-command -->
 
 On Windows, use this in a second PowerShell terminal instead:
 

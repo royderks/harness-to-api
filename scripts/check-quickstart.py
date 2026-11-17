@@ -33,9 +33,16 @@ def main():
     parser.add_argument('--h2a', type=Path, required=True)
     parser.add_argument('--fixture', type=Path, required=True)
     parser.add_argument('--guide', type=Path, default=GUIDE, help='Guide to execute (for documentation drift tests)')
+    parser.add_argument('--human-guide', type=Path, default=ROOT / 'docs/getting-started.md')
     args = parser.parse_args()
     check(os.name == 'posix', 'This checker requires POSIX process signals')
     commands = blocks(args.guide.read_text())
+    human_blocks = re.findall(r'<!-- quickstart-command: client -->\s*```sh\n(.*?)```\s*<!-- /quickstart-command -->', args.human_guide.read_text(), re.S)
+    check(len(human_blocks) == 1, 'Expected exactly one marked human client block')
+    human_client = human_blocks[0]
+    # Only the documented origin is replaced; endpoint and credential path stay literal.
+    origin = 'http://127.0.0.1:8787'
+    check(human_client.count(origin) == 1, 'Expected the documented loopback origin once')
     with tempfile.TemporaryDirectory(prefix='h2a-guide-') as tmp:
         root = Path(tmp)
         bindir = root / 'bin'
@@ -48,8 +55,11 @@ def main():
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0))
             port = sock.getsockname()[1]
-        state, events = root / 'state', root / 'events'
-        env = dict(os.environ, PATH=str(bindir) + os.pathsep + os.environ.get('PATH', ''), H2A_STATE=str(state), H2A_EVENTS=str(events), H2A_PORT=str(port))
+        home = root / 'home'
+        home.mkdir(mode=0o700)
+        state, events = home / '.harness-to-api', root / 'events'
+        commands['human-client'] = human_client.replace(origin, f'http://127.0.0.1:{port}')
+        env = dict(os.environ, HOME=str(home), PATH=str(bindir) + os.pathsep + os.environ.get('PATH', ''), H2A_STATE=str(state), H2A_EVENTS=str(events), H2A_PORT=str(port))
         env.pop('OPENAI_API_KEY', None)
         def run(name):
             return subprocess.run(['/bin/sh', '-c', commands[name]], env=env, text=True, capture_output=True, timeout=15)
@@ -83,6 +93,10 @@ def main():
             check(client.returncode == 0 and 'Hello' in client.stdout, 'documented client failed: ' + client.stderr)
             check(token not in client.stdout + client.stderr, 'client printed credential')
             check(len(marker.read_text().splitlines()) == 1, 'client did not invoke exactly one completion')
+            human = run('human-client')
+            check(human.returncode == 0 and 'Hello' in human.stdout, 'documented human client failed: ' + human.stderr)
+            check(token not in human.stdout + human.stderr, 'human client printed credential')
+            check(len(marker.read_text().splitlines()) == 2, 'each documented client must invoke exactly one completion')
             stop(proc)
             proc = None
             key_id = token.split('_')[1]
@@ -91,7 +105,7 @@ def main():
                 check(result.returncode == 0, 'key inspection failed')
                 return json.loads(result.stdout)
             original = inspect(key_id)
-            check(original['accepted'] == 1, 'completion did not debit quota')
+            check(original['accepted'] == 2, 'completion did not debit quota')
             proc = start()
             resumed = wait_ready(proc)
             check(Path(resumed['credential_path']).read_text().strip() == token and inspect(key_id) == original, 'restart changed credential or policy')
@@ -136,7 +150,7 @@ def main():
             check(inspect(other_id) == other_before and settings.read_bytes() == settings_before, 'new setup changed unrelated state')
             stop(proc)
             proc = None
-            print('PASS: documented init, client, resume, expiry refusal, consented repair, and new setup (offline POSIX fixture)')
+            print('PASS: documented init, agent and human clients, resume, expiry refusal, consented repair, and new setup (offline POSIX fixture)')
         finally:
             if proc is not None and proc.poll() is None:
                 proc.send_signal(signal.SIGINT)

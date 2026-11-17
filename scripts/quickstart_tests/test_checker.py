@@ -56,15 +56,22 @@ class QuickstartCheckerTests(unittest.TestCase):
         fixture = os.environ.get('H2A_FIXTURE')
         if not binary or not fixture:
             self.skipTest('set H2A_BIN and H2A_FIXTURE to run black-box drift test')
-        guide = (ROOT / 'docs/agent-quickstart.md').read_text()
-        original = "ready['endpoint'] + '/chat/completions'"
-        self.assertEqual(guide.count(original), 1)
-        with tempfile.TemporaryDirectory() as tmp:
-            broken = Path(tmp) / 'broken.md'
-            broken.write_text(guide.replace(original, "ready['endpoint'] + '/broken'"))
-            result = subprocess.run([sys.executable, str(ROOT / 'scripts/check-quickstart.py'), '--h2a', binary, '--fixture', fixture, '--guide', str(broken)], capture_output=True, text=True, timeout=30)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('documented client failed', result.stderr)
+        cases = [
+            ('docs/agent-quickstart.md', '--guide', "ready['endpoint'] + '/chat/completions'", "ready['endpoint'] + '/broken'", 'documented client failed'),
+            ('docs/getting-started.md', '--human-guide', 'http://127.0.0.1:8787/v1/chat/completions', 'http://127.0.0.1:8787/v1/broken', 'documented human client failed'),
+        ]
+        for filename, flag, original, replacement, error in cases:
+            with self.subTest(guide=filename):
+                guide = (ROOT / filename).read_text()
+                command = re.search(r'<!-- quickstart-command: client -->\s*```sh\n(.*?)```', guide, re.S).group(1)
+                self.assertEqual(command.count(original), 1)
+                self.assertEqual(guide.count(command), 1)
+                with tempfile.TemporaryDirectory() as tmp:
+                    broken = Path(tmp) / 'broken.md'
+                    broken.write_text(guide.replace(command, command.replace(original, replacement)))
+                    result = subprocess.run([sys.executable, str(ROOT / 'scripts/check-quickstart.py'), '--h2a', binary, '--fixture', fixture, flag, str(broken)], capture_output=True, text=True, timeout=30)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(error, result.stderr)
 
 
 if __name__ == '__main__':

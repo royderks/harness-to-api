@@ -22,7 +22,9 @@ are used by PR jobs, including fork and Dependabot PRs.
 
 Root and ordinary `docs/` Markdown-only edits run lightweight documentation checks
 without native builds. The executable getting-started and agent-quickstart guides
-and example README edits run the full checks, including their documented commands.
+and example README edits run the full checks. Both quickstarts' documented POSIX
+clients and the agent init/repair lifecycle execute against fixtures; Windows
+PowerShell guide blocks are not executed by this checker.
 Site-only changes build and test the docs without compiling Rust.
 
 ```sh
