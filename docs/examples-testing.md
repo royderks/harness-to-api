@@ -20,8 +20,10 @@ being unavailable fails the test. It does not silently skip. The Python base ima
 can remain in the Docker cache. No harness account or cloud sandbox credentials
 are used by PR jobs, including fork and Dependabot PRs.
 
-Root and `docs/` Markdown-only edits run lightweight documentation checks without
-native builds. Example README edits currently run the full checks as well.
+Root and ordinary `docs/` Markdown-only edits run lightweight documentation checks
+without native builds. The executable getting-started and agent-quickstart guides
+and example README edits run the full checks, including their documented commands.
+Site-only changes build and test the docs without compiling Rust.
 
 ```sh
 python3 scripts/check-example-docs.py

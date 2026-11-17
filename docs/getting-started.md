@@ -6,30 +6,19 @@ harness-to-api (`h2a`) gives clients a local, OpenAI-compatible text API for an 
 
 Install and sign in to the official [Codex CLI](https://developers.openai.com/codex/cli/): run `codex login` and check `codex --version` in your terminal. Login and model access depend on your account.
 
-On macOS or Linux (amd64 or arm64), install the published native binary:
+In **terminal 1**, install and launch setup with one command. On macOS or Linux (amd64 or arm64):
 
 ```sh
-H2A_INSTALL_ONLY=1 sh -c 'curl -fsSL https://raw.githubusercontent.com/royderks/harness-to-api/main/install.sh | sh'
-export PATH="$HOME/.local/bin:$PATH"
-h2a --version
+curl -fsSL https://raw.githubusercontent.com/royderks/harness-to-api/main/install.sh | sh
 ```
 
 On Windows PowerShell:
 
 ```powershell
-$env:H2A_INSTALL_ONLY = '1'
 irm https://raw.githubusercontent.com/royderks/harness-to-api/main/install.ps1 | iex
-$env:PATH = "$HOME\.local\bin;$env:PATH"
-h2a --version
 ```
 
-The installer checks the archive checksum and defaults to `~/.local/bin`; add it to PATH in each fresh shell, or use the absolute path. If you set `H2A_INSTALL_DIR`, use that directory. The installer uses its pinned release; see [releases](https://github.com/royderks/harness-to-api/releases) if it is unavailable.
-
-In **terminal 1**, start the interactive setup:
-
-```sh
-h2a init
-```
+The installer checks the archive checksum, installs to `~/.local/bin`, and starts `h2a init`. No Rust toolchain is needed. It uses its pinned release; see [releases](https://github.com/royderks/harness-to-api/releases) if it is unavailable. To start again in a fresh shell, run `~/.local/bin/h2a init` on macOS/Linux or `& "$HOME\.local\bin\h2a.exe" init` in PowerShell. If you set `H2A_INSTALL_DIR`, use that directory instead.
 
 Choose Codex, accept `codex/default`, port `8787`, and the default state directory, confirm the plan, and decline the optional probe. Leave this terminal running. `Ready (unverified)` means the local listener is up; it does not confirm account or model access. Init uses loopback and creates a key scoped to exactly that model, expiring after one hour, with 20 accepted requests, five per minute, one concurrent request and a 90-second request timeout. Accepted failures count; these limits do not cap provider spending. The harness runs with your host account's permissions.
 

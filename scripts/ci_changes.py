@@ -8,12 +8,20 @@ import subprocess
 
 
 def needs_build(paths):
-    # Only documentation locations are exempt; unfamiliar inputs run all checks.
-    return not paths or any(
-        not (PurePosixPath(path).suffix == '.md' and
-             (len(PurePosixPath(path).parts) == 1 or path.startswith('docs/')))
-        for path in paths
-    )
+    executable_guides = {'docs/getting-started.md', 'docs/agent-quickstart.md'}
+    docs_tools = {'requirements-docs.txt', 'scripts/build-docs.py'}
+    if not paths:
+        return True
+    for path in paths:
+        if path in executable_guides:
+            return True
+        if path in docs_tools or path.startswith(('site/', 'scripts/docs_tests/')):
+            continue
+        if PurePosixPath(path).suffix == '.md' and (
+                len(PurePosixPath(path).parts) == 1 or path.startswith('docs/')):
+            continue
+        return True
+    return False
 
 
 def changed_paths(event, name):

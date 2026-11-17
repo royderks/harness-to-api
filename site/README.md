@@ -30,6 +30,7 @@ local development while required guides are being authored; omit it for a
 publishable build. The builder only replaces a nonempty output directory when
 it contains its own `.h2a-docs-build` marker.
 
-`assets/social-card.svg` is a 1200 × 630 vector card used in page metadata. To
-set a repository social preview, export it to a 1200 × 630 PNG and upload it
-through the repository's GitHub settings. This is a separate manual action.
+`assets/social-card.svg` is the editable source for the 1200 × 630
+`assets/social-card.png` used in page metadata. Render the SVG at its native
+size when changing the card. The PNG can also be uploaded in GitHub repository
+settings as the social preview.

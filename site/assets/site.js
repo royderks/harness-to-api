@@ -1,4 +1,11 @@
 'use strict';
+document.documentElement.classList.add('js');
+const navToggle = document.querySelector('.nav-toggle');
+navToggle.addEventListener('click', () => {
+  const open = navToggle.getAttribute('aria-expanded') !== 'true';
+  navToggle.setAttribute('aria-expanded', String(open));
+  navToggle.closest('aside').classList.toggle('nav-open', open);
+});
 async function copyText(text, status) {
   try {
     if (!navigator.clipboard || !window.isSecureContext) throw new Error('Clipboard unavailable');

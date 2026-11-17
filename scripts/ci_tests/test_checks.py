@@ -23,11 +23,15 @@ readme = load('check_readme')
 
 class CheckSelection(unittest.TestCase):
     def test_conservative_path_selection(self):
-        for paths in [['README.md'], ['README.md', 'docs/api.md']]:
+        for paths in [['README.md'], ['README.md', 'docs/api.md'],
+                      ['site/assets/site.css', 'scripts/build-docs.py', 'requirements-docs.txt'],
+                      ['scripts/docs_tests/test_site.py']]:
             self.assertFalse(changes.needs_build(paths))
         for paths in [[], ['Cargo.lock'], ['src/main.rs'], ['README.md', 'src/main.rs'],
                       ['.github/workflows/ci.yml'], ['docs/example.py'], ['new-file'],
-                      ['src/template.md'], ['README.md\nsrc/main.rs']]:
+                      ['src/template.md'], ['README.md\nsrc/main.rs'],
+                      ['docs/getting-started.md'], ['docs/agent-quickstart.md'],
+                      ['site/assets/site.css', 'src/main.rs']]:
             self.assertTrue(changes.needs_build(paths), paths)
 
     def test_real_git_diff_and_failed_detection(self):

@@ -42,3 +42,9 @@ These choices define the architecture of harness-to-api. Changes to them belong 
 - Pin imported issue identities in a local journal. Treat issue-body markers as discovery hints; require explicit adoption or recovery when identity is ambiguous.
 
 See [architecture](docs/architecture.md), [key policies](docs/policies.md), [onboarding](docs/onboarding.md), and the [factory guide](docs/factory.md) for the implementation contracts.
+
+## Documentation and adoption
+
+- Keep human guides and agent instructions in repository Markdown. Generate the public site and its downloadable Markdown from those same sources; no separate CMS.
+- Run annotated agent quickstart commands against the offline gateway in CI. Ordinary prose edits need documentation checks; executable quickstart edits also require native lifecycle checks.
+- Publish verified native archives before changing public installer defaults. Keep fixture proof distinct from live harness access and cloud sandbox results.
