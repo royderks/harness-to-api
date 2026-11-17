@@ -42,7 +42,7 @@ shutil.copyfile(pathlib.Path(os.environ['FIXTURES'])/url.rsplit('/',1)[1],args[a
         p.chmod(0o755)
 
     def archive(self, platform='darwin_arm64', content=b'#!/bin/sh\necho installed\n', symlink=False):
-        name = 'h2a_v0.1.0_' + platform + '.tar.gz'
+        name = 'h2a_v0.1.1_' + platform + '.tar.gz'
         with tarfile.open(self.root / name, 'w:gz') as tar:
             info = tarfile.TarInfo('./h2a')
             info.mode = 0o755
@@ -54,7 +54,7 @@ shutil.copyfile(pathlib.Path(os.environ['FIXTURES'])/url.rsplit('/',1)[1],args[a
                 info.size = len(content)
                 tar.addfile(info, io.BytesIO(content))
         digest = hashlib.sha256((self.root / name).read_bytes()).hexdigest()
-        (self.root / ('checksums_v0.1.0_' + platform + '.txt')).write_text(digest + '  ' + name + '\n')
+        (self.root / ('checksums_v0.1.1_' + platform + '.txt')).write_text(digest + '  ' + name + '\n')
 
     def run_install(self):
         return subprocess.run(['sh', str(ROOT / 'install.sh')], env=self.env,
@@ -77,10 +77,10 @@ shutil.copyfile(pathlib.Path(os.environ['FIXTURES'])/url.rsplit('/',1)[1],args[a
             self.assertEqual(p.returncode, 0, p.stderr)
 
     def test_failures_preserve_binary(self):
-        checksum = self.root / 'checksums_v0.1.0_darwin_arm64.txt'
+        checksum = self.root / 'checksums_v0.1.1_darwin_arm64.txt'
         original = checksum.read_text()
-        for bad in ['0' * 64 + '  h2a_v0.1.0_darwin_arm64.tar.gz\n', original + original,
-                    original.replace('h2a_v0.1.0_darwin_arm64.tar.gz', '../elsewhere')]:
+        for bad in ['0' * 64 + '  h2a_v0.1.1_darwin_arm64.tar.gz\n', original + original,
+                    original.replace('h2a_v0.1.1_darwin_arm64.tar.gz', '../elsewhere')]:
             checksum.write_text(bad)
             self.assertNotEqual(self.run_install().returncode, 0)
             self.assertEqual((self.dest / 'h2a').read_text(), 'existing binary')
