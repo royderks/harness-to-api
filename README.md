@@ -1,16 +1,20 @@
 # harness-to-api
 
-**Your coding harness. One OpenAI-compatible endpoint.**
+**Use your coding harness from OpenAI clients, agent frameworks and sandboxes.**
 
-Put your coding harness behind an API key. Point an OpenAI client at it—from your laptop, a container, or a remote sandbox.
+Turn an installed, authenticated Codex, Claude Code, Gemini or other supported
+harness into a local OpenAI-compatible text-completion endpoint. Give each client
+its own key with a model scope, expiry and request limit. Provider logins stay on
+the host.
 
-A single native Rust binary. End users do **not** need Rust, Node, or Python to run the gateway. Install and authenticate each harness CLI separately.
+One native binary, `h2a`. No Rust toolchain needed. Your harness still needs its
+own installation and login.
 
-The project is **harness-to-api**; the executable is `h2a`.
+[Getting started](docs/getting-started.md) · [Give this to your agent](docs/agent-quickstart.md) · [Examples](examples/README.md) · [API reference](docs/api.md)
 
 ## Getting started
 
-Install and start h2a:
+Install and start setup in a terminal:
 
 **macOS / Linux**
 ```sh
@@ -22,50 +26,68 @@ curl -fsSL https://raw.githubusercontent.com/royderks/harness-to-api/main/instal
 irm https://raw.githubusercontent.com/royderks/harness-to-api/main/install.ps1 | iex
 ```
 
-The command installs h2a and asks which harness you want to use or add, marking the ones already installed. If needed, setup shows its installation and sign-in commands. Keep the terminal open while the gateway runs. No Rust needed. See [installation details](docs/distribution.md) for manual downloads and requirements.
+Select your harness and model, then keep the terminal open while the gateway runs.
+Your client connects to `http://127.0.0.1:8787/v1` using the separate gateway key
+file shown by setup. The default onboarding key lasts one hour and permits 20
+requests to the selected model. A live probe is optional and consumes a request.
 
-It shows the provider, endpoint, state location, and bounded key policy before setup. A live probe is a separate opt-in; setup alone does not make an inference request. The endpoint is unverified until a probe succeeds. Keep the process running and stop it with Ctrl+C. See [onboarding](docs/onboarding.md) for a client example, automation, and recovery.
+Next, follow the [first-request guide](docs/getting-started.md) in a second terminal.
+It reads the key without printing it and checks the completion response. Stop the
+gateway with **Ctrl+C**. [Installation details](docs/distribution.md) cover manual
+downloads, PATH and supported platforms.
 
-The lower-level `keys create` and `serve` commands remain available; see the [CLI guide](docs/cli.md).
+## Give this to your agent
 
-Give a sandbox bounded access with an expiring key:
+Paste this into your coding agent:
 
-```sh
-export OPENAI_API_KEY="$(h2a keys create --name sandbox \
-  --models 'codex/*' --ttl 1h --request-timeout 90s \
-  --max-requests 20 --rate-limit 5/min --max-concurrent 1)"
+```text
+Read https://raw.githubusercontent.com/royderks/harness-to-api/main/docs/agent-quickstart.md
+and set up harness-to-api for this project using an installed harness. Connect a
+client and verify one completion. Keep credentials local and do not enable remote
+access. Ask me to complete any provider login myself.
 ```
 
-Limits persist across restarts. Expiry and revocation cancel active managed runs. Use `keys inspect` to see policy and usage, `keys explain` for local checks, and `probe` for an explicit real request. See [key policies and model validation](docs/policies.md) and the [architecture](docs/architecture.md).
+The [agent guide](docs/agent-quickstart.md) covers noninteractive setup, process
+ownership, credential files, verification and expired-key recovery. It uses the
+same CLI as the human quickstart.
 
-```sh
-curl http://127.0.0.1:8787/v1/chat/completions \
-  -H "Authorization: Bearer $OPENAI_API_KEY" \
-  -H 'Content-Type: application/json' \
-  -d '{"model":"codex/default","messages":[{"role":"user","content":"Explain a reverse proxy in one sentence."}],"stream":true}'
+## Three things to try
+
+| Use case | What you get | Start here |
+| --- | --- | --- |
+| Use Codex from an OpenAI client | Stream a completion through your installed harness; switch models by changing the prefixed model ID. | [Harness switching](examples/harness-switch/) |
+| Draft with Codex, review with Gemini | A two-step LangGraph workflow using two harnesses through one API. | [LangGraph](examples/langgraph/) |
+| Give an OpenShell sandbox bounded access | Run the client in a local sandbox while provider login stays on the host. No paid OpenShell account. | [OpenShell](examples/openshell/) |
+
+Also available: [OpenAI Agents SDK](examples/agents-sdk/), [Docker](examples/docker/),
+[E2B](examples/e2b/) and [Modal](examples/modal/). Each example lists prerequisites
+and request usage. [Verification](examples/VERIFICATION.md) separates offline
+fixture checks from live-provider and real-sandbox evidence.
+
+## Use an OpenAI client
+
+After starting the gateway, use the credential file shown by setup. With the
+default state directory:
+
+```python
+from pathlib import Path
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://127.0.0.1:8787/v1",
+    api_key=(Path.home() / ".harness-to-api/init/client.key").read_text().strip(),
+    max_retries=0,
+)
+response = client.chat.completions.create(
+    model="codex/default",
+    messages=[{"role": "user", "content": "Say hello."}],
+)
+print(response.choices[0].message.content)
 ```
 
-## Commands
-
-<!-- commands:start -->
-| Command | Purpose |
-| --- | --- |
-| `h2a init` | Set up bounded local access and run the gateway in the foreground. |
-| `h2a init repair` | Discard an interrupted onboarding setup after identity checks and explicit confirmation. |
-| `h2a doctor` | Check installed harness and tunnel binaries; does not verify login. |
-| `h2a serve` | Start the API with existing keys and selected harnesses. |
-| `h2a probe` | Make a real completion request to verify access; consumes quota. |
-| `h2a share` | Print tunnel setup instructions; does not change networking. |
-| `h2a keys create` | Create a scoped key with optional expiry and limits; prints its secret once. |
-| `h2a keys list` | List stored key metadata without secrets. |
-| `h2a keys inspect` | Show a key's policy and durable usage. |
-| `h2a keys explain` | Check whether a model would be allowed by a key and supplied configuration. |
-| `h2a keys revoke` | Revoke a key and cancel its active managed requests. |
-| `h2a version` | Print the gateway version; also available as `h2a --version`. |
-| `h2a help` | Show usage; also available as `h2a --help` or `h2a -h`. |
-<!-- commands:end -->
-
-For command flags, use commands such as `h2a help serve` or `h2a keys create --help`. See the [CLI guide](docs/cli.md) for full usage.
+Use the model selected during setup. SDK dependencies belong to the client, not
+the gateway. See complete [Python](examples/client.py) and
+[JavaScript](examples/client.mjs) examples.
 
 ## Supported harnesses
 
@@ -93,27 +115,27 @@ Codex skips user configuration but retains account login. Its CLI must support `
 
 h2a invokes installed CLIs and extensions; it does not extract OAuth tokens or call private provider endpoints. Each provider controls login, subscription access, model eligibility, and limits. Gateway keys are separate from provider credentials.
 
-## Use an OpenAI client
+## Commands
 
-```python
-import os
-from openai import OpenAI
+<!-- commands:start -->
+| Command | Purpose |
+| --- | --- |
+| `h2a init` | Set up bounded local access and run the gateway in the foreground. |
+| `h2a init repair` | Discard an interrupted onboarding setup after identity checks and explicit confirmation. |
+| `h2a doctor` | Check installed harness and tunnel binaries; does not verify login. |
+| `h2a serve` | Start the API with existing keys and selected harnesses. |
+| `h2a probe` | Make a real completion request to verify access; consumes quota. |
+| `h2a share` | Print tunnel setup instructions; does not change networking. |
+| `h2a keys create` | Create a scoped key with optional expiry and limits; prints its secret once. |
+| `h2a keys list` | List stored key metadata without secrets. |
+| `h2a keys inspect` | Show a key's policy and durable usage. |
+| `h2a keys explain` | Check whether a model would be allowed by a key and supplied configuration. |
+| `h2a keys revoke` | Revoke a key and cancel its active managed requests. |
+| `h2a version` | Print the gateway version; also available as `h2a --version`. |
+| `h2a help` | Show usage; also available as `h2a --help` or `h2a -h`. |
+<!-- commands:end -->
 
-client = OpenAI(
-    base_url=os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:8787/v1"),
-    api_key=os.environ["OPENAI_API_KEY"],
-)
-response = client.chat.completions.create(
-    model="codex/default",
-    messages=[{"role": "user", "content": "Say hello."}],
-)
-print(response.choices[0].message.content)
-```
-
-See [JavaScript](examples/client.mjs) and [Python](examples/client.py) examples. SDK dependencies are needed by the example client, not by the gateway.
-
-[Runnable examples](examples/README.md): switch between harnesses, run LangGraph or
-the OpenAI Agents SDK, and connect Docker, OpenShell, E2B, or Modal clients.
+For command flags, use commands such as `h2a help serve` or `h2a keys create --help`. See the [CLI guide](docs/cli.md) for full usage.
 
 ## API and execution boundary
 

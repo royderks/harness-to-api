@@ -24,10 +24,15 @@ This test does not contact a provider or demonstrate resistance to arbitrary tra
 
 ## Documentation and CI selection
 
-PRs that change only root Markdown files or Markdown under `docs/` run README link,
+PRs that change only root Markdown files or ordinary Markdown under `docs/` run README link,
 command-reference and CI selection checks without compiling Rust. The four required
 check names still report results; native-check jobs report that no native build was
-needed. Other paths, empty/unknown diffs and changes to CI itself run the full checks.
+needed. The executable getting-started and agent-quickstart guides run native
+checks that execute both documented POSIX clients and the agent init/repair lifecycle.
+Installer and interactive chooser checks are separate; these checks do not execute
+the Windows PowerShell guide. Site assets and docs tooling run the
+site build and tests without a Rust build. Other paths, empty/unknown diffs and
+changes to CI itself run the full checks.
 A failed diff calculation or documentation check fails the required checks.
 Feature branches run checks on PR events; pushes to `main` are also checked.
 

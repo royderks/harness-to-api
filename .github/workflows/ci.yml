@@ -24,6 +24,13 @@ jobs:
       - run: python3 scripts/check-example-docs.py
       - run: python3 -m unittest discover -s examples/tests -p test_example_docs.py -v
       - run: python3 -m unittest discover -s scripts/live_tests -v
+      - name: Build and test the documentation site
+        run: |
+          python3 -m venv .venv-docs
+          .venv-docs/bin/python -m pip install -r requirements-docs.txt
+          .venv-docs/bin/python -m unittest discover -s scripts/docs_tests -v
+          .venv-docs/bin/python scripts/build-docs.py
+      - run: python3 -m unittest discover -s scripts/quickstart_tests -v
       - id: paths
         run: python3 scripts/ci_changes.py
   test:
@@ -86,6 +93,8 @@ jobs:
           python3 scripts/check-policies.py
           python3 scripts/check-connection-pressure.py
           python3 scripts/check-init.py
+          python3 scripts/check-quickstart.py --h2a "$H2A_BIN" --fixture "$H2A_FIXTURE"
+          python3 -m unittest discover -s scripts/quickstart_tests -v
       - uses: actions/setup-python@v5
         if: needs.changes.outputs.build == 'true' && runner.os == 'Linux'
         with:
