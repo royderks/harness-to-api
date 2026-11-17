@@ -59,6 +59,30 @@ def resolve_link(source, output, href):
     return url + (('?' + parts.query) if parts.query else '') + (('#' + parts.fragment) if parts.fragment else '')
 
 
+def raw_markdown(source):
+    """Keep selected Markdown links local; point other repository files to GitHub."""
+    text = (ROOT / source).read_text(encoding='utf-8')
+    def rewrite(match):
+        href = match.group(1)
+        parts = urlsplit(href)
+        if parts.scheme or parts.netloc or not parts.path:
+            return match.group(0)
+        path = posixpath.normpath(posixpath.join(posixpath.dirname(source), unquote(parts.path)))
+        if path.startswith('../') or path == '..':
+            raise ValueError(f'Link escapes repository in {source}: {href}')
+        if (ROOT / path).is_dir() or path.endswith('/'):
+            path = posixpath.join(path, 'README.md')
+        if path in PAGES:
+            target = relative('raw/' + source, 'raw/' + path)
+        else:
+            if not (ROOT / path).is_file():
+                raise ValueError(f'Broken link in {source}: {href}')
+            target = 'https://raw.githubusercontent.com/royderks/harness-to-api/main/' + path
+        target += (('?' + parts.query) if parts.query else '') + (('#' + parts.fragment) if parts.fragment else '')
+        return '](' + target + match.group(2) + ')'
+    return re.sub(r'\]\(([^)\s]+)([^)]*)\)', rewrite, text)
+
+
 def slug(text):
     return re.sub(r'[^\w\- ]', '', text.lower()).replace(' ', '-')
 
@@ -110,7 +134,7 @@ def build(destination, allow_missing=False):
         target.write_text(page, encoding='utf-8')
         raw_target = destination / 'raw' / source
         raw_target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(ROOT / source, raw_target)
+        raw_target.write_text(raw_markdown(source), encoding='utf-8')
     lines = ['# harness-to-api', '', '> An authenticated, OpenAI-compatible text API for installed coding harnesses.', '', '## Documentation', '']
     lines += [f'- [{title}]({PUBLIC}raw/{source})' for source, (_, title) in PAGES.items() if source not in missing]
     (destination / 'llms.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')

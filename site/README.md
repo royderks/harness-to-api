@@ -3,7 +3,9 @@
 The site is generated from the Markdown files listed in `scripts/build-docs.py`.
 The default build requires every listed page, including the getting started,
 agent quickstart, and troubleshooting guides. It does not fetch content or run
-commands from Markdown. Raw HTML is escaped.
+commands from Markdown. Raw HTML is escaped. Downloadable Markdown retains its
+content, with repository links rewritten to the site or GitHub so they resolve
+from the raw document location.
 
 ```sh
 python3 -m venv .venv

@@ -68,7 +68,17 @@ class SiteTests(unittest.TestCase):
                 if parts.fragment and target in pages:
                     self.assertIn(unquote(parts.fragment), pages[target].ids, (file, link))
         for source in site.PAGES:
-            self.assertEqual((self.output / 'raw' / source).read_bytes(), (self.root / source).read_bytes())
+            raw = (self.output / 'raw' / source).read_text(encoding='utf-8')
+            tokens = site.MarkdownIt('commonmark', {'html': False}).enable('table').parse(raw)
+            for token in tokens:
+                for child in token.children or []:
+                    if child.type not in ('link_open', 'image'):
+                        continue
+                    link = child.attrGet('href' if child.type == 'link_open' else 'src')
+                    parts = urlsplit(link)
+                    if not parts.scheme and not parts.netloc and parts.path:
+                        target = (self.output / 'raw' / source).parent / unquote(parts.path)
+                        self.assertTrue(target.is_file(), (source, link))
             self.assertIn(site.PUBLIC + 'raw/' + source, (self.output / 'llms.txt').read_text())
 
     def test_missing_pages_fail_and_existing_directory_is_protected(self):
@@ -79,6 +89,11 @@ class SiteTests(unittest.TestCase):
         (self.output / 'keep').write_text('safe')
         with self.assertRaisesRegex(SystemExit, 'unmarked'):
             site.build(self.output, allow_missing=True)
+        self.assertEqual((self.output / 'keep').read_text(), 'safe')
+        alias = Path(self.tmp.name) / 'output-link'
+        alias.symlink_to(self.output, target_is_directory=True)
+        with self.assertRaisesRegex(SystemExit, 'unmarked'):
+            site.build(alias, allow_missing=True)
         self.assertEqual((self.output / 'keep').read_text(), 'safe')
 
     def test_raw_html_is_escaped(self):
