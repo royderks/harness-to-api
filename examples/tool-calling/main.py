@@ -43,7 +43,7 @@ def streamed(response):
             if choice.index != 0 or finish is not None:
                 raise ValueError("Unexpected stream choice")
             delta = choice.delta
-            if delta.content is not None:
+            if delta.content:
                 content.append(delta.content)
             for call in delta.tool_calls or []:
                 state = calls.setdefault(call.index, {"id": "", "type": None, "name": "", "arguments": ""})

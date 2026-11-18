@@ -99,7 +99,8 @@ class ToolCalling(unittest.TestCase):
             return N(choices=[N(index=0, finish_reason=finish, delta=N(content=None, tool_calls=[call] if call else []))])
         def fragment(id=None, kind=None, name=None, arguments=None):
             return N(index=0, id=id, type=kind, function=N(name=name, arguments=arguments))
-        fragments = [chunk(fragment('call_', 'function', 'lookup_', '{\"service\":')),
+        opening = N(choices=[N(index=0, finish_reason=None, delta=N(content='', tool_calls=[]))])
+        fragments = [opening, chunk(fragment('call_', 'function', 'lookup_', '{\"service\":')),
                      chunk(fragment('fixture', None, 'status', '\"api\"}'))]
         with self.assertRaises(ValueError):
             module.streamed(fragments)
