@@ -11,21 +11,18 @@ from agents import Agent, Runner, OpenAIChatCompletionsModel, function_tool, set
 import httpx
 from openai import AsyncOpenAI
 
-calls = 0
-
-@function_tool
-async def lookup_status(service: str) -> str:
-    """Look up the status of a local service."""
-    global calls
-    calls += 1
-    if service != "api":
-        raise ValueError("Unknown service")
-    return "operational"
-
-
 async def demo(stream=False):
-    global calls
     calls = 0
+
+    @function_tool
+    async def lookup_status(service: str) -> str:
+        """Look up the status of a local service."""
+        nonlocal calls
+        calls += 1
+        if calls != 1 or service != "api":
+            raise ValueError("Expected one lookup of the api service")
+        return "operational"
+
     set_tracing_disabled(True)
     base, token, model = config()
     async with AsyncOpenAI(base_url=base, api_key=token, max_retries=0, timeout=150,

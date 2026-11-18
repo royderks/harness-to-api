@@ -63,7 +63,8 @@ def main():
                 # Do not let a developer's optional SDK tracing settings export fixture data.
                 env.update(LANGSMITH_TRACING="false", LANGCHAIN_TRACING_V2="false", OPENAI_AGENTS_DISABLE_TRACING="1")
                 manifest = json.loads((EXAMPLES / "commands.json").read_text())
-                commands = [entry["commands"][0] for entry in manifest.values() if entry["offline"]]
+                commands = [entry["commands"][0] for name, entry in manifest.items()
+                            if entry["offline"] and name != "tool-calling"]
                 commands.append("python examples/_client.py")
                 for documented in commands:
                     argv = shlex.split(documented)

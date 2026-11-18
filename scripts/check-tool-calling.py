@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import shlex
 import signal
 import socket
 import subprocess
@@ -45,9 +46,15 @@ def main():
                 else:
                     raise RuntimeError('gateway startup timed out')
                 env = dict(os.environ, OPENAI_BASE_URL=base + '/v1', OPENAI_API_KEY=token, H2A_MODEL='codex/default', OPENAI_AGENTS_DISABLE_TRACING='1')
-                flows = [('main.py', []), ('main.py', ['--stream']), ('agent.py', []), ('agent.py', ['--stream'])]
-                for index, (script, flags) in enumerate(flows, 1):
-                    result = subprocess.run([sys.executable, str(ROOT / 'examples/tool-calling' / script), *flags], env=env, capture_output=True, text=True, timeout=90)
+                commands = json.loads((ROOT / 'examples/commands.json').read_text())['tool-calling']['commands']
+                if len(commands) != 4 or len(set(commands)) != 4:
+                    raise RuntimeError('Expected four documented tool-loop commands')
+                for index, command in enumerate(commands, 1):
+                    parts = shlex.split(command)
+                    if parts[0] != 'python' or parts[1] not in ('examples/tool-calling/main.py', 'examples/tool-calling/agent.py') or parts[2:] not in ([], ['--stream']):
+                        raise RuntimeError('Invalid documented tool-loop command')
+                    script, flags = Path(parts[1]).name, parts[2:]
+                    result = subprocess.run([sys.executable, str(ROOT / parts[1]), *flags], env=env, capture_output=True, text=True, timeout=90)
                     if token in result.stdout + result.stderr or result.returncode or 'operational' not in result.stdout.lower():
                         raise RuntimeError('Client failed: ' + script + ' ' + ' '.join(flags))
                     snapshot = json.loads(cli('keys', 'inspect', identifier))

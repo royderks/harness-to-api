@@ -73,3 +73,12 @@ h2a probe --base-url http://127.0.0.1:8787/v1 --model codex/gpt-5
 ```
 
 Probe reads `OPENAI_API_KEY` and sends a real completion request with a fixed prompt. It announces the request on stderr; it consumes quota when admitted. Its stdout JSON contains `checked_at`, `model`, `available`, and an HTTP status when received, without the completion text or provider errors. It requires a valid completed chat response; arbitrary HTTP 200 bodies do not count as success. A failed probe exits nonzero after printing its result. Success indicates the request succeeded at that moment, not lasting account entitlement. Redirects are disabled, requests time out after 90 seconds, and plain HTTP requires a literal loopback IP address; use HTTPS for remote gateways.
+
+
+To check client function-call support explicitly:
+
+```sh
+h2a probe --base-url http://127.0.0.1:8787/v1 --model codex/default --tool-call
+```
+
+This sends one forced `h2a_probe` function definition with empty arguments. It checks the returned call's name, ID, JSON arguments and `tool_calls` finish reason, but never executes the function. The sanitized result includes `capability: "tool_call"` and `available`; a plain text response is not success. The request consumes one accepted-request allowance and provider capacity. It verifies this one generated call, not every tool schema or future request. Ordinary `probe` and `init` retain their text checks.

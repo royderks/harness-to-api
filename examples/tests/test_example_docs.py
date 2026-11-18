@@ -54,6 +54,15 @@ class ExampleDocs(unittest.TestCase):
         path.write_text(path.read_text().replace('python examples/agents-sdk/main.py', 'python examples/agents-sdk/main.py --changed'))
         self.assertTrue(any('command' in error for error in checker.check(self.root)))
 
+    def test_missing_tool_agent_fails(self):
+        (self.root / 'examples/tool-calling/agent.py').unlink()
+        self.assertTrue(any('invalid Python launch' in error for error in checker.check(self.root)))
+
+    def test_tool_stream_command_drift_fails(self):
+        path = self.root / 'examples/tool-calling/README.md'
+        path.write_text(path.read_text().replace('agent.py --stream', 'agent.py --other'))
+        self.assertTrue(any('command' in error for error in checker.check(self.root)))
+
     def test_missing_example_fails(self):
         shutil.rmtree(self.root / 'examples/modal')
         self.assertTrue(any('modal' in error for error in checker.check(self.root)))

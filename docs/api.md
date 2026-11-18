@@ -2,15 +2,15 @@
 
 Implemented:
 
-- `POST /v1/chat/completions`: text messages with system, developer, user, and assistant roles.
+- `POST /v1/chat/completions`: text messages and client function-tool turns, including correlated assistant calls and tool results.
 - `POST /v1/completions`: one string prompt.
 - SSE streaming with `[DONE]`, OpenAI-shaped errors, and optional `stream_options.include_usage`.
 - `GET /v1/models`: configured models permitted by the key when `serve --allowed-models` is set; otherwise enabled provider aliases and exact key scopes. This is not a live account/model catalog.
 - `GET /healthz`: unauthenticated liveness only.
 
-Conversation messages are serialized into one fresh harness prompt. This preserves supplied conversation text, but does not implement provider-native role precedence or saved chat sessions. Codex streams completed assistant message items; Antigravity, Pi/Bob, Gemini, and Claude stream their response deltas; OpenCode emits completed text parts. No adapter guarantees token-by-token latency. Reasoning and tool output are filtered out. Usage is the harness's aggregate run usage, which may cover multiple model calls; unavailable usage is omitted.
+Conversation messages are serialized into one fresh harness prompt. This preserves supplied conversation text, but does not implement provider-native role precedence or saved chat sessions. Codex streams completed assistant message items; Antigravity, Pi/Bob, Gemini, and Claude stream their response deltas; OpenCode emits completed text parts. No adapter guarantees token-by-token latency. Reasoning and harness-internal tool output are filtered out. Client function calls follow the separate bridge contract below. Usage is the harness's aggregate run usage, which may cover multiple model calls; unavailable usage is omitted.
 
-This is a text-completion compatibility layer, not the entire OpenAI API. Unsupported fields—including `tools`, `temperature`, `max_tokens`, `stop`, and `response_format`—return HTTP 400. There is no Responses API, embeddings, images, logprobs, token-array prompt, batch prompting, or `n > 1` support. A client that always sends unsupported sampling fields needs to omit them.
+This is a text-completion compatibility layer, not the entire OpenAI API. Unsupported fields—including `temperature`, `max_tokens`, `stop`, and `response_format`—return HTTP 400. There is no Responses API, embeddings, images, logprobs, token-array prompt, batch prompting, or `n > 1` support. A client that always sends unsupported sampling fields needs to omit them.
 
 ## Admission limits
 
@@ -22,3 +22,62 @@ See [bounded API keys](policies.md) for flags, inspection, validation, and live 
 
 Duplicate JSON field names, including case-insensitive duplicates, are rejected
 at every nesting level before admission. Use one value for each field.
+
+
+## Client function tools
+
+Use the existing `POST /v1/chat/completions` route. Send OpenAI-shaped function definitions in `tools`; your application executes the selected function and sends its result in the next request. The [executable recipe](../examples/tool-calling/README.md) covers both the OpenAI SDK and Agents SDK, including streaming. This source feature is not present in v0.1.0.
+
+```json
+{
+  "model": "codex/default",
+  "messages": [{"role": "user", "content": "Check the api service."}],
+  "tools": [{"type": "function", "function": {
+    "name": "lookup_status",
+    "description": "Look up a local service status",
+    "parameters": {
+      "type": "object",
+      "properties": {"service": {"type": "string"}},
+      "required": ["service"],
+      "additionalProperties": false
+    },
+    "strict": true
+  }}],
+  "parallel_tool_calls": false
+}
+```
+
+A tool-call response has `finish_reason: "tool_calls"` and a standard assistant message:
+
+```json
+{
+  "role": "assistant",
+  "content": null,
+  "tool_calls": [{
+    "id": "call_EXAMPLE",
+    "type": "function",
+    "function": {"name": "lookup_status", "arguments": "{\"service\":\"api\"}"}
+  }]
+}
+```
+
+Preserve that assistant message in `messages`, then append `{"role":"tool","tool_call_id":"call_EXAMPLE","content":"operational"}` using the actual returned ID. Supply every result for that assistant turn before requesting the next turn. h2a rejects orphaned, repeated, or unresolved result IDs. History is carried by the client; there is no saved gateway chat session. A final text answer uses `finish_reason: "stop"`.
+
+| Field | Supported behavior |
+| --- | --- |
+| `tools` | Function definitions with unique names, descriptions and supported object parameter schemas. Other tool types are rejected. |
+| `tool_choice` | `auto` (default with tools), `none`, `required`, or `{"type":"function","function":{"name":"lookup_status"}}`. Required/named choices need matching definitions. |
+| `parallel_tool_calls` | Boolean, default `true`; `false` allows at most one returned call. Execution scheduling belongs to your client. |
+| `strict` | Returned arguments are validated against the supported schema. This is validate-or-error, not native constrained decoding. Non-strict definitions are also validated. |
+| Assistant `tool_calls` | IDs, type `function`, name and JSON-string arguments; assistant content can be null. |
+| Tool result | Role `tool`, text `content`, and the matching `tool_call_id`. |
+
+### Generation and execution boundaries
+
+All configured harnesses use an API-owned structured-output bridge for these turns. The gateway asks the harness for a terminal answer or proposed calls, then validates the full output before returning it. It does not expose the harness's internal tools, run caller functions, or add retries to repair invalid output. Model compliance depends on the installed harness and model; fixture tests establish protocol behavior, not live model reliability or factual correctness.
+
+Tool turns buffer output before emitting content or calls. Streaming still uses standard `chat.completion.chunk` objects: an assistant role, indexed `delta.tool_calls` with IDs, function names and JSON-string arguments, then `finish_reason: "tool_calls"`, optional usage, and `[DONE]`. Arguments may arrive in one complete chunk. Heartbeats can arrive while the model is running. Final-answer turns emit content with `stop`. This does not promise token-by-token tool latency.
+
+Invalid request definitions, histories, or unsupported schema features return HTTP 400 before admission and consume no request allowance. Malformed model output returns sanitized HTTP 502 `invalid_harness_output`; after SSE headers it produces a stream error without a successful finish or `[DONE]`. Accepted failed turns still count. Each tool-loop round is a separate completion request, so the two-round examples consume two accepted requests. Cancellation, expiry and revocation use the same admission and subprocess cleanup as text requests.
+
+Function names and arguments are untrusted model output. Clients must allowlist functions, validate arguments and authorize side effects before execution. Neither a valid schema nor an API key grants authority to run a shell command. The gateway's existing host execution boundary remains unchanged.

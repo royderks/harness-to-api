@@ -114,3 +114,8 @@ gh run download RUN_ID --name live-example-EXAMPLE-RUN_ID
 
 No real-provider or cloud success date is claimed until an actual live run passes.
 See [current example evidence](../examples/VERIFICATION.md).
+
+
+## Client function tools
+
+The offline Linux example job also runs `python scripts/check-tool-calling.py` with the built gateway and harness fixture. It executes the four documented OpenAI/Agents SDK tool-loop commands (streaming and nonstreaming), requiring two accepted completions and one local function execution per flow, then checks quota and revocation denials. Client boundary tests reject incomplete streams and malformed calls. Runtime tests own request/schema validation and cancellation. These are offline protocol checks; they do not establish live-provider function-selection reliability.

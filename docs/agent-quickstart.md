@@ -117,3 +117,10 @@ h2a init repair --state-dir "$H2A_STATE" --discard --yes --json
 <!-- /quickstart-command -->
 
 Repair revokes the recorded onboarding key and removes its profile and credential; unrelated keys are retained. If identity is inconsistent, follow the reported manual recovery instructions instead of guessing. Only after consent to a new setup, run init again; it creates a new bounded key. See [onboarding and recovery](onboarding.md#automation-and-recovery) for details.
+
+
+## Add client function tools
+
+Use the [tool-calling example](../examples/tool-calling/README.md) after your first text request succeeds. It covers the OpenAI SDK, streamed tool calls, and an Agents SDK function tool. Your client validates and executes an allowlisted function, then sends its result with the matching `tool_call_id`. Each model turn is a separate accepted request. Never execute a function merely because model output names it; the example limits dispatch to a local registry lookup.
+
+Read the [API function-tool contract](api.md#client-function-tools) for schema limits and buffered streaming. A successful `h2a probe --tool-call --model codex/default` checks one proposed call without executing it. Tool support requires the source version that adds these examples; the v0.1.0 installer release does not support it.

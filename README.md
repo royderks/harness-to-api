@@ -3,7 +3,7 @@
 **Use your coding harness from OpenAI clients, agent frameworks and sandboxes.**
 
 Turn an installed, authenticated Codex, Claude Code, Gemini or other supported
-harness into a local OpenAI-compatible text-completion endpoint. Give each client
+harness into a local OpenAI-compatible chat endpoint. Give each client
 its own key with a model scope, expiry and request limit. Provider logins stay on
 the host.
 
@@ -139,7 +139,7 @@ For command flags, use commands such as `h2a help serve` or `h2a keys create --h
 
 ## API and execution boundary
 
-Text chat completions, legacy completions, model listing, and SSE streaming are implemented. See [the API contract](docs/api.md) for supported fields and errors. This is a text-completion adapter; tool calling and the full OpenAI API are not implemented.
+Text chat completions, legacy completions, model listing, and SSE streaming are implemented. See [the API contract](docs/api.md) for supported fields and errors. Chat Completions also supports [client function tools](examples/tool-calling/README.md): your application executes the function and returns its result. Tool turns use a validated structured-output bridge, not native harness tool dispatch. The full OpenAI API is not implemented. Tool support requires a build from this source revision; v0.1.0 does not include it.
 
 ## Keys and permissions
 
