@@ -36,7 +36,7 @@ def check(root):
             allowed_commands = {f'python examples/{name}/main.py'}
             if name == 'tool-calling':
                 allowed_commands = {f'python examples/tool-calling/{script}.py{suffix}'
-                                    for script in ('main', 'agent') for suffix in ('', ' --stream')}
+                                    for script in ('main', 'agent') for suffix in (('', ' --stream') if script == 'main' else ('',))}
             if name == 'openshell':
                 allowed_commands.add('python examples/openshell/main.py --local')
             if command.startswith('python examples/') and (command not in allowed_commands or not (root / command.split()[1]).is_file()):

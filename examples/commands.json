@@ -66,8 +66,7 @@
     "commands": [
       "python examples/tool-calling/main.py",
       "python examples/tool-calling/main.py --stream",
-      "python examples/tool-calling/agent.py",
-      "python examples/tool-calling/agent.py --stream"
+      "python examples/tool-calling/agent.py"
     ],
     "dependencies": [
       "openai",

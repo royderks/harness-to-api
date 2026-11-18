@@ -26,6 +26,8 @@ class Fixture(BaseHTTPRequestHandler):
         message = ({'role': 'assistant', 'content': None, 'tool_calls': [{'id': 'call_fixture', 'type': 'function', 'function': {'name': 'lookup_status', 'arguments': '{"service":"api"}'}}]}
                    if first else {'role': 'assistant', 'content': 'api is operational'})
         finish = 'tool_calls' if first else 'stop'
+        if getattr(self.server, 'omit_finish', None) == ('first' if first else 'second'):
+            finish = None
         self.send_response(200)
         self.send_header('Content-Type', 'text/event-stream' if request.get('stream') else 'application/json')
         self.end_headers()
@@ -49,7 +51,7 @@ class ToolCalling(unittest.TestCase):
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
         env = dict(os.environ, OPENAI_BASE_URL=f'http://127.0.0.1:{server.server_port}/v1', OPENAI_API_KEY='fixture-key', H2A_MODEL='codex/default', OPENAI_AGENTS_DISABLE_TRACING='1')
-        for script, stream in [('main.py', False), ('main.py', True), ('agent.py', False), ('agent.py', True)]:
+        for script, stream in [('main.py', False), ('main.py', True), ('agent.py', False)]:
             with self.subTest(script=script, stream=stream):
                 before = len(server.requests)
                 argv = [sys.executable, str(ROOT / 'examples/tool-calling' / script)] + (['--stream'] if stream else [])
@@ -61,6 +63,25 @@ class ToolCalling(unittest.TestCase):
                 self.assertEqual(first['tools'][0]['function']['name'], 'lookup_status')
                 self.assertTrue(first['tools'][0]['function']['strict'])
                 self.assertEqual(next(m for m in second['messages'] if m['role'] == 'tool')['tool_call_id'], 'call_fixture')
+
+    def test_agents_reject_incomplete_turn_before_continuing(self):
+        for omitted, count in [('first', 1), ('second', 2)]:
+            with self.subTest(omitted=omitted):
+                server = ThreadingHTTPServer(('127.0.0.1', 0), Fixture)
+                server.requests = []
+                server.omit_finish = omitted
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    env = dict(os.environ, OPENAI_BASE_URL=f'http://127.0.0.1:{server.server_port}/v1', OPENAI_API_KEY='fixture-key', H2A_MODEL='codex/default', OPENAI_AGENTS_DISABLE_TRACING='1')
+                    proc = subprocess.run([sys.executable, str(ROOT / 'examples/tool-calling/agent.py')], env=env, capture_output=True, text=True, timeout=30)
+                    self.assertNotEqual(proc.returncode, 0)
+                    self.assertNotIn('operational', proc.stdout)
+                    self.assertEqual(len(server.requests), count)
+                finally:
+                    server.shutdown()
+                    server.server_close()
+                    thread.join()
 
     def test_incomplete_stream_and_bad_arguments_rejected(self):
         spec = importlib.util.spec_from_file_location('tool_example', ROOT / 'examples/tool-calling/main.py')

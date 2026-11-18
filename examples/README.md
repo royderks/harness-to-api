@@ -124,4 +124,4 @@ setup or run Docker, OpenShell, E2B, or Modal commands. OpenShell's checked
 blocks describe manual profile, provider, sandbox, and cleanup operations; the
 check does not execute or validate those resources.
 
-The four tool-calling commands run separately with `python scripts/check-tool-calling.py`, using the same `H2A_BIN` and `H2A_FIXTURE` variables. That checker exercises the real SDK clients and gateway; fixtures do not establish live model compliance.
+The three tool-calling commands run separately with `python scripts/check-tool-calling.py`, using the same `H2A_BIN` and `H2A_FIXTURE` variables. That checker exercises the real SDK clients and gateway; fixtures do not establish live model compliance.

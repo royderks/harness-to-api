@@ -91,6 +91,9 @@ fn tool_probe_rejects_text_and_malformed_calls() {
     text["choices"][0]["finish_reason"] = json!("stop");
     text["choices"][0]["message"]["content"] = json!("PRIVATE_RESPONSE");
     cases.push(text);
+    let mut mixed = tool_response();
+    mixed["choices"][0]["message"]["content"] = json!("PRIVATE_RESPONSE");
+    cases.push(mixed);
     for (path, value) in [("id", json!("")), ("type", json!("other"))] {
         let mut body = tool_response();
         body["choices"][0]["message"]["tool_calls"][0][path] = value;

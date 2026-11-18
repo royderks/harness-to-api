@@ -135,7 +135,7 @@ fn valid_choice(choice: &Value, tool_call: bool) -> bool {
                 .as_str()
                 .is_some_and(|s| !s.trim().is_empty());
     }
-    if choice["finish_reason"] != "tool_calls" {
+    if choice["finish_reason"] != "tool_calls" || !message["content"].is_null() {
         return false;
     }
     let Some(calls) = message["tool_calls"]

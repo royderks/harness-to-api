@@ -26,7 +26,7 @@ def main():
             if result.returncode:
                 raise RuntimeError('h2a command failed: ' + ' '.join(args[:2]))
             return result.stdout.strip()
-        token = cli('keys', 'create', '--name', 'tools-fixture', '--models', 'codex/default', '--ttl', '10m', '--max-requests', '8', '--request-timeout', '20s', '--max-concurrent', '1')
+        token = cli('keys', 'create', '--name', 'tools-fixture', '--models', 'codex/default', '--ttl', '10m', '--max-requests', '6', '--request-timeout', '20s', '--max-concurrent', '1')
         identifier = token.split('_')[1]
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0))
@@ -47,8 +47,8 @@ def main():
                     raise RuntimeError('gateway startup timed out')
                 env = dict(os.environ, OPENAI_BASE_URL=base + '/v1', OPENAI_API_KEY=token, H2A_MODEL='codex/default', OPENAI_AGENTS_DISABLE_TRACING='1')
                 commands = json.loads((ROOT / 'examples/commands.json').read_text())['tool-calling']['commands']
-                if len(commands) != 4 or len(set(commands)) != 4:
-                    raise RuntimeError('Expected four documented tool-loop commands')
+                if len(commands) != 3 or len(set(commands)) != 3:
+                    raise RuntimeError('Expected three documented tool-loop commands')
                 for index, command in enumerate(commands, 1):
                     parts = shlex.split(command)
                     if parts[0] != 'python' or parts[1] not in ('examples/tool-calling/main.py', 'examples/tool-calling/agent.py') or parts[2:] not in ([], ['--stream']):

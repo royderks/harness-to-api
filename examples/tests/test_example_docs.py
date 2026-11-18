@@ -60,7 +60,7 @@ class ExampleDocs(unittest.TestCase):
 
     def test_tool_stream_command_drift_fails(self):
         path = self.root / 'examples/tool-calling/README.md'
-        path.write_text(path.read_text().replace('agent.py --stream', 'agent.py --other'))
+        path.write_text(path.read_text().replace('main.py --stream', 'main.py --other'))
         self.assertTrue(any('command' in error for error in checker.check(self.root)))
 
     def test_missing_example_fails(self):
