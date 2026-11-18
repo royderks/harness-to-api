@@ -91,7 +91,7 @@ isolate that host. See [execution boundaries](../docs/architecture.md).
 
 - Send `model` as `provider/model` and text `messages` to `/v1/chat/completions`.
 - Use `stream: true` for SSE. The [tool-calling recipe](tool-calling/) supports client-owned function loops through Chat Completions. Tool turns buffer output until validated.
-- No Responses API, response-format schema, `temperature`, `max_tokens`, or other sampling fields. No request fields are silently stripped. Read the [API contract](../docs/api.md) for the function schema subset and validate-or-error semantics. Tool support requires a source build containing this feature; v0.1.0 is text-only.
+- No Responses API, response-format schema, `temperature`, `max_tokens`, or other sampling fields. No request fields are silently stripped. Read the [API contract](../docs/api.md) for the function schema subset and validate-or-error semantics. Tool support is included in v0.1.1; v0.1.0 is text-only.
 - `_client.py` holds shared configuration and the dependency-free HTTP client
   copied into sandboxes. It rejects redirects and requires HTTPS outside literal
   loopback. SDK clients also disable redirects, proxy environment inheritance,
