@@ -25,6 +25,8 @@ class Fixture(BaseHTTPRequestHandler):
             assert tool['tool_call_id'] == 'call_fixture' and tool['content'] == 'operational'
         message = ({'role': 'assistant', 'content': None, 'tool_calls': [{'id': 'call_fixture', 'type': 'function', 'function': {'name': 'lookup_status', 'arguments': '{"service":"api"}'}}]}
                    if first else {'role': 'assistant', 'content': 'api is operational'})
+        if first and hasattr(self.server, 'first_calls'):
+            message['tool_calls'] = self.server.first_calls
         finish = 'tool_calls' if first else 'stop'
         if getattr(self.server, 'omit_finish', None) == ('first' if first else 'second'):
             finish = None
@@ -78,6 +80,31 @@ class ToolCalling(unittest.TestCase):
                     self.assertNotEqual(proc.returncode, 0)
                     self.assertNotIn('operational', proc.stdout)
                     self.assertEqual(len(server.requests), count)
+                finally:
+                    server.shutdown()
+                    server.server_close()
+                    thread.join()
+
+    def test_agents_reject_disallowed_calls_without_another_request(self):
+        def call(arguments='{"service":"api"}', name='lookup_status'):
+            return {'id': 'call_fixture', 'type': 'function', 'function': {'name': name, 'arguments': arguments}}
+        cases = [[call(arguments)] for arguments in (
+            '{"service":"unknown"}', '{"service":"unknown","service":"api"}',
+            '{"service":"api","extra":1}', '{}', '{"service":1}',
+        )] + [[call(name='unexpected')], [call(), call()]]
+        for calls in cases:
+            with self.subTest(calls=calls):
+                server = ThreadingHTTPServer(('127.0.0.1', 0), Fixture)
+                server.requests = []
+                server.first_calls = calls
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    env = dict(os.environ, OPENAI_BASE_URL=f'http://127.0.0.1:{server.server_port}/v1', OPENAI_API_KEY='fixture-key', H2A_MODEL='codex/default', OPENAI_AGENTS_DISABLE_TRACING='1')
+                    proc = subprocess.run([sys.executable, str(ROOT / 'examples/tool-calling/agent.py')], env=env, capture_output=True, text=True, timeout=30)
+                    self.assertNotEqual(proc.returncode, 0)
+                    self.assertNotIn('operational', proc.stdout)
+                    self.assertEqual(len(server.requests), 1)
                 finally:
                     server.shutdown()
                     server.server_close()

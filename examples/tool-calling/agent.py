@@ -1,5 +1,6 @@
 """Agents SDK executes the same local function through Chat Completions."""
 import asyncio
+import json
 import os
 import sys
 from pathlib import Path
@@ -9,6 +10,15 @@ from _client import config, require_text, run
 from agents import Agent, Runner, OpenAIChatCompletionsModel, function_tool, set_tracing_disabled
 import httpx
 from openai import AsyncOpenAI
+
+def argument_pairs(items):
+    result = {}
+    for key, value in items:
+        if key in result:
+            raise ValueError("Duplicate tool argument")
+        result[key] = value
+    return result
+
 
 async def require_completed_turn(response):
     if response.status_code != 200:
@@ -23,20 +33,30 @@ async def require_completed_turn(response):
     calls = message.get("tool_calls")
     if message.get("role") != "assistant" or choice.get("finish_reason") != ("tool_calls" if calls else "stop"):
         raise ValueError("Incomplete model turn")
-    if calls and message.get("content") is not None:
-        raise ValueError("Conflicting tool-call content")
+    if calls:
+        if message.get("content") is not None or not isinstance(calls, list) or len(calls) != 1:
+            raise ValueError("Expected one tool call without assistant text")
+        call = calls[0]
+        if not isinstance(call, dict) or call.get("type") != "function" or not isinstance(call.get("id"), str) or not call["id"]:
+            raise ValueError("Invalid tool call")
+        function = call.get("function")
+        if not isinstance(function, dict) or function.get("name") != "lookup_status" or not isinstance(function.get("arguments"), str):
+            raise ValueError("Unexpected function")
+        arguments = json.loads(function["arguments"], object_pairs_hook=argument_pairs)
+        if arguments != {"service": "api"}:
+            raise ValueError("Expected only service api")
 
 
 async def demo():
     calls = 0
 
-    @function_tool
+    @function_tool(failure_error_function=None)
     async def lookup_status(service: str) -> str:
         """Look up the status of a local service."""
         nonlocal calls
-        calls += 1
-        if calls != 1 or service != "api":
+        if calls != 0 or service != "api":
             raise ValueError("Expected one lookup of the api service")
+        calls += 1
         return "operational"
 
     set_tracing_disabled(True)
