@@ -20,6 +20,33 @@ enum Choice {
     Named(String),
 }
 
+#[derive(Clone)]
+pub(super) enum Outcome {
+    Text(String),
+    Calls(Vec<Call>),
+}
+#[derive(Clone)]
+pub(super) struct Call {
+    id: String,
+    name: String,
+    arguments: String,
+}
+impl Call {
+    pub fn wire(&self) -> Value {
+        json!({"id":self.id,"type":"function","function":{"name":self.name,"arguments":self.arguments}})
+    }
+}
+impl Outcome {
+    pub fn message(&self) -> Value {
+        match self {
+            Self::Text(text) => json!({"role":"assistant","content":text}),
+            Self::Calls(calls) => {
+                json!({"role":"assistant","content":null,"tool_calls":calls.iter().map(Call::wire).collect::<Vec<_>>()})
+            }
+        }
+    }
+}
+
 fn object<'a>(
     v: &'a Value,
     keys: &[&str],
@@ -302,7 +329,7 @@ impl Bridge {
             parallel,
         })
     }
-    pub fn validate(&self, bytes: &[u8]) -> Result<Value, &'static str> {
+    pub fn validate(&self, bytes: &[u8]) -> Result<Outcome, &'static str> {
         let v = super::request::strict_json(bytes)?;
         let o = v.as_object().ok_or("invalid output")?;
         if o.get("version") != Some(&json!(1)) {
@@ -314,7 +341,7 @@ impl Bridge {
                     && o.get("content").is_some_and(Value::is_string)
                     && matches!(self.choice, Choice::None | Choice::Auto) =>
             {
-                Ok(json!({"role":"assistant","content":o["content"]}))
+                Ok(Outcome::Text(o["content"].as_str().unwrap().to_owned()))
             }
             Some("tool_calls") if o.len() == 3 && !matches!(self.choice, Choice::None) => {
                 let calls = o
@@ -325,6 +352,8 @@ impl Bridge {
                     return Err("invalid output");
                 }
                 let mut result = Vec::new();
+                let mut ids = HashSet::new();
+                let mut budget = 100_000;
                 for c in calls {
                     let c = object(c, &["name", "arguments"])?;
                     if c.len() != 2 {
@@ -340,12 +369,22 @@ impl Bridge {
                         .find(|t| t.name == n)
                         .ok_or("invalid output")?;
                     let a = c.get("arguments").ok_or("invalid output")?;
-                    if !a.is_object() || !matches(a, &t.schema, &mut 100_000) {
+                    if !a.is_object() || !matches(a, &t.schema, &mut budget) {
                         return Err("invalid output");
                     }
-                    result.push(json!({"id":format!("call_{}",super::random_id()),"type":"function","function":{"name":n,"arguments":serde_json::to_string(a).unwrap()}}));
+                    let id = loop {
+                        let id = format!("call_{}", super::random_id());
+                        if ids.insert(id.clone()) {
+                            break id;
+                        }
+                    };
+                    result.push(Call {
+                        id,
+                        name: n,
+                        arguments: serde_json::to_string(a).unwrap(),
+                    });
                 }
-                Ok(json!({"role":"assistant","content":null,"tool_calls":result}))
+                Ok(Outcome::Calls(result))
             }
             _ => Err("invalid output"),
         }

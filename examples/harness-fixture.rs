@@ -201,18 +201,46 @@ fn main() {
             "{invalid".to_string()
         } else if mode == "bridge-duplicate" {
             r#"{"version":1,"kind":"text","content":"secret","content":"x"}"#.to_string()
-        } else if mode == "bridge-text" {
+        } else if mode == "bridge-text"
+            || data["tool_choice"] == "none"
+            || data["tools"]
+                .as_array()
+                .is_some_and(|tools| tools.is_empty())
+        {
             json!({"version":1,"kind":"text","content":"fixture answer"}).to_string()
         } else {
             let tools = data["tools"].as_array().unwrap();
-            let tool = tools.first().unwrap();
+            let tool = data["tool_choice"]["function"]["name"]
+                .as_str()
+                .and_then(|name| tools.iter().find(|tool| tool["function"]["name"] == name))
+                .unwrap_or(&tools[0]);
             let name = tool["function"]["name"].as_str().unwrap();
             let arguments = if name == "h2a_probe" {
                 json!({})
             } else {
                 json!({"service":"api"})
             };
-            json!({"version":1,"kind":"tool_calls","calls":[{"name":if mode == "bridge-unknown" {"unknown"} else {name},"arguments":arguments}]}).to_string()
+            let name = if mode == "bridge-unknown" {
+                "unknown"
+            } else {
+                name
+            };
+            let arguments = if mode == "bridge-bad-args" {
+                json!({"unexpected":true})
+            } else {
+                arguments
+            };
+            let calls = if mode == "bridge-empty" {
+                vec![]
+            } else if mode == "bridge-parallel" {
+                vec![
+                    json!({"name":name,"arguments":arguments}),
+                    json!({"name":name,"arguments":arguments}),
+                ]
+            } else {
+                vec![json!({"name":name,"arguments":arguments})]
+            };
+            json!({"version":1,"kind":"tool_calls","calls":calls}).to_string()
         };
         Some(output)
     } else {

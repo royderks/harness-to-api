@@ -327,10 +327,10 @@ impl Server {
                     tokio::select! {
                         event = events.recv() => match event {
                             Some(Event::Message(message)) => {
-                                if let Some(calls) = message.get("tool_calls").and_then(Value::as_array) {
-                                    finish_reason = "tool_calls";
-                                    for (index, call) in calls.iter().enumerate() { let mut call = call.clone(); call["index"] = json!(index); yield Ok(sse(chunk(&id,created,&model,chat,json!({"tool_calls":[call]}),None,req.include_usage))); }
-                                } else { yield Ok(sse(chunk(&id,created,&model,chat,json!({"content":message["content"]}),None,req.include_usage))); }
+                                match message {
+                                    tools::Outcome::Calls(calls) => { finish_reason = "tool_calls"; for (index, call) in calls.iter().enumerate() { let mut call = call.wire(); call["index"] = json!(index); yield Ok(sse(chunk(&id,created,&model,chat,json!({"tool_calls":[call]}),None,req.include_usage))); } },
+                                    tools::Outcome::Text(text) => yield Ok(sse(chunk(&id,created,&model,chat,json!({"content":text}),None,req.include_usage))),
+                                }
                             }
                             Some(Event::Text(text)) => yield Ok(sse(chunk(&id,created,&model,chat,json!({"content":text}),None,req.include_usage))),
                             Some(Event::Finished(usage)) => {
@@ -362,8 +362,9 @@ impl Server {
                 Event::Finished(usage) => {
                     let mut choice = json!({"index":0,"finish_reason":"stop","logprobs":null});
                     if chat {
-                        let message =
-                            message.unwrap_or_else(|| json!({"role":"assistant","content":text}));
+                        let message = message
+                            .map(|outcome: tools::Outcome| outcome.message())
+                            .unwrap_or_else(|| json!({"role":"assistant","content":text}));
                         if message.get("tool_calls").is_some() {
                             choice["finish_reason"] = json!("tool_calls");
                         }
@@ -462,7 +463,7 @@ async fn forward_output(
 type RunError = (u16, &'static str, &'static str);
 enum Event {
     Text(String),
-    Message(Value),
+    Message(tools::Outcome),
     Finished(Option<harness::Usage>),
     Failed(RunError),
 }

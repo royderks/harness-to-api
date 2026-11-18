@@ -81,9 +81,18 @@ pub(super) fn parse(data: &[u8], chat: bool) -> Result<Request, &'static str> {
     if !chat && (tools.is_some() || choice.is_some() || parallel.is_some()) {
         return Err("tools require chat completions");
     }
-    let tool_data = tools.clone().unwrap_or(json!([]));
-    let choice_data = choice.clone().unwrap_or(Value::Null);
-    let parallel_data = parallel.clone().unwrap_or(Value::Bool(true));
+    let tool_data = tools.clone().filter(|v| !v.is_null()).unwrap_or(json!([]));
+    let choice_data = choice.clone().filter(|v| !v.is_null()).unwrap_or_else(|| {
+        if tool_data.as_array().is_some_and(|a| !a.is_empty()) {
+            json!("auto")
+        } else {
+            json!("none")
+        }
+    });
+    let parallel_data = parallel
+        .clone()
+        .filter(|v| !v.is_null())
+        .unwrap_or(Value::Bool(true));
     let mut bridge = None;
     let messages = present(r.remove("messages"));
     let prompt = present(r.remove("prompt"));
