@@ -69,6 +69,19 @@ def main():
                 cli('keys', 'revoke', identifier)
                 denied('401')
                 print('PASS quota and revocation', flush=True)
+                probe_token = cli('keys', 'create', '--name', 'tool-probe-fixture', '--models', 'codex/default', '--max-requests', '1', '--request-timeout', '20s')
+                probe_id = probe_token.split('_')[1]
+                probe = subprocess.run([str(BIN), 'probe', '--base-url', base + '/v1', '--model', 'codex/default', '--tool-call'],
+                                       env=dict(env, OPENAI_API_KEY=probe_token), capture_output=True, text=True, timeout=30)
+                if probe.returncode or probe_token in probe.stdout + probe.stderr:
+                    raise RuntimeError('Tool-call CLI probe failed')
+                result = json.loads(probe.stdout)
+                if result.get('available') is not True or result.get('capability') != 'tool_call':
+                    raise RuntimeError('Tool-call CLI probe did not verify capability')
+                if json.loads(cli('keys', 'inspect', probe_id))['accepted'] != 1:
+                    raise RuntimeError('Probe did not consume exactly one request')
+                cli('keys', 'revoke', probe_id)
+                print('PASS explicit CLI tool-call probe: one request, no function execution', flush=True)
             finally:
                 server.send_signal(signal.SIGINT)
                 try:

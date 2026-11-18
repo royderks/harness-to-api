@@ -72,6 +72,14 @@ Preserve that assistant message in `messages`, then append `{"role":"tool","tool
 | Assistant `tool_calls` | IDs, type `function`, name and JSON-string arguments; assistant content can be null. |
 | Tool result | Role `tool`, text `content`, and the matching `tool_call_id`. |
 
+### Supported parameter schemas
+
+Function parameters must have a root `type: "object"`. Supported keywords are `type`, `properties`, `required`, boolean `additionalProperties`, `items`, `enum`, `anyOf`, and string `title`/`description` annotations. Types are `object`, `array`, `string`, `number`, `integer`, `boolean`, and `null`; arrays require `items`. Use `anyOf` for nullable values. Required names must refer to declared properties. Extra properties default to allowed unless disabled.
+
+For `strict: true`, every object must set `additionalProperties: false` and list every property in `required`. Returned values are validated even when strict is false. Unknown keywords are errors, including `$ref`, `$defs`, `format`, `default`, `oneOf`, `allOf`, and numeric/string/array constraint keywords. Schema references are not resolved. This is a supported subset, not full JSON Schema.
+
+Limits are 64 tools or returned calls, schema depth 16, 128 properties per object, 128 enum values, and 16 `anyOf` branches. Argument validation has a shared 100,000-step budget per response and fails closed when exceeded. The existing 1 MiB request and 8 MiB assistant-output limits apply. The recursive duplicate-key rule also applies inside schemas and arguments; keys differing only by ASCII case are rejected.
+
 ### Generation and execution boundaries
 
 All configured harnesses use an API-owned structured-output bridge for these turns. The gateway asks the harness for a terminal answer or proposed calls, then validates the full output before returning it. It does not expose the harness's internal tools, run caller functions, or add retries to repair invalid output. Model compliance depends on the installed harness and model; fixture tests establish protocol behavior, not live model reliability or factual correctness.
