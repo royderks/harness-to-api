@@ -179,6 +179,7 @@ async fn rejected_requests_and_invalid_generation_do_not_leak() {
     for model in [
         "codex/bridge-malformed",
         "codex/bridge-duplicate",
+        "codex/bridge-trailing",
         "codex/bridge-unknown",
         "codex/bridge-text",
         "codex/bridge-bad-args",
@@ -201,7 +202,7 @@ async fn rejected_requests_and_invalid_generation_do_not_leak() {
             assert!(!text.contains("lookup_status"));
         }
     }
-    assert_eq!(s.accepted(), 14);
+    assert_eq!(s.accepted(), 16);
     s.end().await;
 }
 
@@ -453,6 +454,44 @@ async fn timeout_and_revocation_do_not_expose_buffered_output() {
         .unwrap()
         .unwrap();
     assert!(text.contains("invalid_api_key"));
+    assert!(!text.contains("[DONE]"));
+    assert!(!text.contains("h2a-"));
+    s.end().await;
+}
+
+#[tokio::test]
+async fn oversized_output_and_shutdown_fail_without_partial_result() {
+    let Some(s) = Running::start(vec![]).await else {
+        return;
+    };
+    for stream in [false, true] {
+        let r = s
+            .post(
+                "/v1/chat/completions",
+                body("codex/bridge-oversize", stream),
+            )
+            .send()
+            .await
+            .unwrap();
+        if !stream {
+            assert_eq!(r.status(), 502);
+        }
+        let text = r.text().await.unwrap();
+        assert!(text.contains("harness_failed"));
+        assert!(!text.contains("[DONE]"));
+        assert!(!text.contains("tool_calls"));
+    }
+    let r = s
+        .post("/v1/chat/completions", body("codex/emit-hang", true))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(s.accepted(), 3);
+    s.stop.cancel();
+    let text = tokio::time::timeout(Duration::from_secs(4), r.text())
+        .await
+        .unwrap()
+        .unwrap_or_default();
     assert!(!text.contains("[DONE]"));
     assert!(!text.contains("h2a-"));
     s.end().await;

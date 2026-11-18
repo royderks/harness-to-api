@@ -202,6 +202,10 @@ fn main() {
             json!({"version":1,"kind":"text","content":"Service api is operational."}).to_string()
         } else if mode == "bridge-malformed" {
             "{invalid".to_string()
+        } else if mode == "bridge-trailing" {
+            "{\"version\":1,\"kind\":\"text\",\"content\":\"secret\"} trailing".to_string()
+        } else if mode == "bridge-oversize" {
+            "x".repeat(9 * 1024 * 1024)
         } else if mode == "bridge-duplicate" {
             r#"{"version":1,"kind":"text","content":"secret","content":"x"}"#.to_string()
         } else if mode == "bridge-text"
