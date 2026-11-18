@@ -139,7 +139,7 @@ For command flags, use commands such as `h2a help serve` or `h2a keys create --h
 
 ## API and execution boundary
 
-Text chat completions, legacy completions, model listing, and SSE streaming are implemented. See [the API contract](docs/api.md) for supported fields and errors. Chat Completions also supports [client function tools](examples/tool-calling/README.md): your application executes the function and returns its result. Tool turns use a validated structured-output bridge, not native harness tool dispatch. The full OpenAI API is not implemented. Tool support requires a build from this source revision; v0.1.0 does not include it.
+Text chat completions, legacy completions, model listing, and SSE streaming are implemented. See [the API contract](docs/api.md) for supported fields and errors. Chat Completions also supports [client function tools](examples/tool-calling/README.md): your application executes the function and returns its result. Tool turns use a validated structured-output bridge, not native harness tool dispatch. The full OpenAI API is not implemented. Tool support is included in v0.1.1; v0.1.0 does not include it.
 
 ## Keys and permissions
 
