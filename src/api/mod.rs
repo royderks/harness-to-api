@@ -571,7 +571,6 @@ mod forwarding_tests {
     #[tokio::test]
     async fn completion_drains_text_produced_in_the_same_poll() {
         let (deltas, rx) = mpsc::channel(8);
-        let bridge = req.bridge;
         let (sender, mut events) = mpsc::channel(8);
         let run = async move {
             deltas.send("first".into()).await.unwrap();
@@ -582,7 +581,6 @@ mod forwarding_tests {
         assert!(result.is_ok());
         drop(sender);
         let mut text = String::new();
-        let mut message = None;
         while let Some(event) = events.recv().await {
             match event {
                 Event::Text(delta) => text.push_str(&delta),

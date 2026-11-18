@@ -189,6 +189,9 @@ fn main() {
         let output = if history.last().is_some_and(|m| m["role"] == "tool") {
             let result = history.last().unwrap();
             let id = result["tool_call_id"].as_str().unwrap();
+            if result["content"] != "operational" {
+                std::process::exit(11);
+            }
             if !history.iter().any(|m| {
                 m["tool_calls"]
                     .as_array()
@@ -196,13 +199,13 @@ fn main() {
             }) {
                 std::process::exit(11);
             }
-            json!({"version":1,"kind":"text","content":"Service api is healthy."}).to_string()
+            json!({"version":1,"kind":"text","content":"Service api is operational."}).to_string()
         } else if mode == "bridge-malformed" {
             "{invalid".to_string()
         } else if mode == "bridge-duplicate" {
             r#"{"version":1,"kind":"text","content":"secret","content":"x"}"#.to_string()
         } else if mode == "bridge-text"
-            || data["tool_choice"] == "none"
+            || (data["tool_choice"] == "none" && mode != "bridge-force")
             || data["tools"]
                 .as_array()
                 .is_some_and(|tools| tools.is_empty())

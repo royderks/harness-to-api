@@ -81,18 +81,12 @@ pub(super) fn parse(data: &[u8], chat: bool) -> Result<Request, &'static str> {
     if !chat && (tools.is_some() || choice.is_some() || parallel.is_some()) {
         return Err("tools require chat completions");
     }
-    let tool_data = tools.clone().filter(|v| !v.is_null()).unwrap_or(json!([]));
-    let choice_data = choice.clone().filter(|v| !v.is_null()).unwrap_or_else(|| {
-        if tool_data.as_array().is_some_and(|a| !a.is_empty()) {
-            json!("auto")
-        } else {
-            json!("none")
-        }
-    });
-    let parallel_data = parallel
-        .clone()
-        .filter(|v| !v.is_null())
-        .unwrap_or(Value::Bool(true));
+    let explicit_options = choice.is_some() || parallel.is_some();
+    let parsed_bridge = if chat {
+        Some(super::tools::Bridge::parse(tools, choice, parallel)?)
+    } else {
+        None
+    };
     let mut bridge = None;
     let messages = present(r.remove("messages"));
     let prompt = present(r.remove("prompt"));
@@ -106,111 +100,14 @@ pub(super) fn parse(data: &[u8], chat: bool) -> Result<Request, &'static str> {
         if messages.is_empty() || messages.len() > 256 {
             return Err("chat requires 1–256 messages and no prompt");
         }
-        let mut normalized = Vec::new();
-        let mut pending = std::collections::HashSet::new();
-        let mut has_history = false;
-        for message in messages {
-            let mut m = fields(message, &["role", "content", "tool_calls", "tool_call_id"])?;
-            let role = string(m.remove("role"))?;
-            if !["system", "developer", "user", "assistant", "tool"].contains(&role.as_str()) {
-                return Err("unsupported message role");
-            }
-            if role != "tool" && !pending.is_empty() {
-                return Err("unanswered tool calls");
-            }
-            let content = match m.remove("content") {
-                Some(Value::String(s)) => Some(s),
-                Some(Value::Array(parts)) if !parts.is_empty() => {
-                    let mut text = String::new();
-                    for part in parts {
-                        let mut p = fields(part, &["type", "text"])?;
-                        if string(p.remove("type"))? != "text" {
-                            return Err("only text content is supported");
-                        }
-                        let Some(Value::String(s)) = p.remove("text") else {
-                            return Err("only text content is supported");
-                        };
-                        text.push_str(&s);
-                    }
-                    Some(text)
-                }
-                None | Some(Value::Null) if role == "assistant" => None,
-                _ => return Err("message content must be text"),
-            };
-            let calls = m.remove("tool_calls");
-            let id = m.remove("tool_call_id");
-            if role == "tool" {
-                has_history = true;
-                if calls.is_some() {
-                    return Err("invalid tool result");
-                }
-                let id = id
-                    .and_then(|v| v.as_str().map(str::to_owned))
-                    .filter(|s| !s.is_empty())
-                    .ok_or("invalid tool result id")?;
-                if !pending.remove(&id) {
-                    return Err("orphan tool result");
-                }
-                normalized.push(json!({"role":role,"content":content.unwrap(),"tool_call_id":id}));
-            } else if role == "assistant" && calls.is_some() {
-                has_history = true;
-                if id.is_some() {
-                    return Err("invalid assistant message");
-                }
-                let Some(Value::Array(calls)) = calls else {
-                    return Err("invalid tool calls");
-                };
-                if calls.is_empty() || calls.len() > 64 {
-                    return Err("invalid tool calls");
-                }
-                let mut normalized_calls = Vec::new();
-                for call in calls {
-                    let mut c = fields(call, &["id", "type", "function"])?;
-                    let id = string(c.remove("id"))?;
-                    if id.is_empty() || id.len() > 256 || !pending.insert(id.clone()) {
-                        return Err("invalid tool call id");
-                    }
-                    if string(c.remove("type"))? != "function" {
-                        return Err("invalid tool call type");
-                    }
-                    let mut f = fields(
-                        c.remove("function").ok_or("missing function")?,
-                        &["name", "arguments"],
-                    )?;
-                    let name = string(f.remove("name"))?;
-                    if name.is_empty()
-                        || name.len() > 64
-                        || !name
-                            .bytes()
-                            .all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
-                    {
-                        return Err("invalid function name");
-                    }
-                    let args = string(f.remove("arguments"))?;
-                    if !strict_json(args.as_bytes())?.is_object() {
-                        return Err("invalid tool arguments");
-                    }
-                    normalized_calls.push(json!({"id":id,"type":"function","function":{"name":name,"arguments":args}}));
-                }
-                normalized
-                    .push(json!({"role":role,"content":content,"tool_calls":normalized_calls}));
-            } else {
-                if calls.is_some() || id.is_some() || content.is_none() {
-                    return Err("invalid message fields");
-                }
-                normalized.push(json!({"role":role,"content":content}));
-            }
-        }
-        if !pending.is_empty() {
-            return Err("unanswered tool calls");
-        }
-        let has_tools = tool_data.as_array().is_none_or(|a| !a.is_empty());
-        if has_tools || has_history || choice.is_some() || parallel.is_some() {
-            bridge = Some(super::tools::Bridge::parse(tools, choice, parallel)?);
+        let (normalized, has_history) = conversation(messages)?;
+        let parsed_bridge = parsed_bridge.expect("chat bridge parsed");
+        if parsed_bridge.has_tools() || has_history || explicit_options {
+            bridge = Some(parsed_bridge);
         }
         // Preserve the documented conversation framing and JSON escaping.
-        let data = if bridge.is_some() {
-            json!({"conversation":normalized,"tools":tool_data,"tool_choice":choice_data,"parallel_tool_calls":parallel_data})
+        let data = if let Some(bridge) = &bridge {
+            bridge.prompt_data(normalized)
         } else {
             json!(normalized)
         };
@@ -249,6 +146,101 @@ pub(super) fn parse(data: &[u8], chat: bool) -> Result<Request, &'static str> {
         prompt,
         bridge,
     })
+}
+
+fn conversation(messages: Vec<Value>) -> Result<(Vec<Value>, bool), &'static str> {
+    let mut normalized = Vec::new();
+    let mut pending = std::collections::HashSet::new();
+    let mut has_history = false;
+    for message in messages {
+        let mut m = fields(message, &["role", "content", "tool_calls", "tool_call_id"])?;
+        let role = string(m.remove("role"))?;
+        if !["system", "developer", "user", "assistant", "tool"].contains(&role.as_str()) {
+            return Err("unsupported message role");
+        }
+        if role != "tool" && !pending.is_empty() {
+            return Err("unanswered tool calls");
+        }
+        let content = match m.remove("content") {
+            Some(Value::String(s)) => Some(s),
+            Some(Value::Array(parts)) if !parts.is_empty() => {
+                let mut text = String::new();
+                for part in parts {
+                    let mut p = fields(part, &["type", "text"])?;
+                    if string(p.remove("type"))? != "text" {
+                        return Err("only text content is supported");
+                    }
+                    let Some(Value::String(s)) = p.remove("text") else {
+                        return Err("only text content is supported");
+                    };
+                    text.push_str(&s);
+                }
+                Some(text)
+            }
+            None | Some(Value::Null) if role == "assistant" => None,
+            _ => return Err("message content must be text"),
+        };
+        let calls = m.remove("tool_calls");
+        let id = m.remove("tool_call_id");
+        if role == "tool" {
+            has_history = true;
+            if calls.is_some() {
+                return Err("invalid tool result");
+            }
+            let id = id
+                .and_then(|v| v.as_str().map(str::to_owned))
+                .filter(|s| !s.is_empty())
+                .ok_or("invalid tool result id")?;
+            if !pending.remove(&id) {
+                return Err("orphan tool result");
+            }
+            normalized.push(json!({"role":role,"content":content.unwrap(),"tool_call_id":id}));
+        } else if role == "assistant" && calls.is_some() {
+            has_history = true;
+            if id.is_some() {
+                return Err("invalid assistant message");
+            }
+            let Some(Value::Array(calls)) = calls else {
+                return Err("invalid tool calls");
+            };
+            if calls.is_empty() || calls.len() > 64 {
+                return Err("invalid tool calls");
+            }
+            let mut normalized_calls = Vec::new();
+            for call in calls {
+                let mut c = fields(call, &["id", "type", "function"])?;
+                let id = string(c.remove("id"))?;
+                if id.is_empty() || id.len() > 256 || !pending.insert(id.clone()) {
+                    return Err("invalid tool call id");
+                }
+                if string(c.remove("type"))? != "function" {
+                    return Err("invalid tool call type");
+                }
+                let mut f = fields(
+                    c.remove("function").ok_or("missing function")?,
+                    &["name", "arguments"],
+                )?;
+                let name = super::tools::name(f.get("name"))?;
+                let args = string(f.remove("arguments"))?;
+                if !strict_json(args.as_bytes())?.is_object() {
+                    return Err("invalid tool arguments");
+                }
+                normalized_calls.push(
+                    json!({"id":id,"type":"function","function":{"name":name,"arguments":args}}),
+                );
+            }
+            normalized.push(json!({"role":role,"content":content,"tool_calls":normalized_calls}));
+        } else {
+            if calls.is_some() || id.is_some() || content.is_none() {
+                return Err("invalid message fields");
+            }
+            normalized.push(json!({"role":role,"content":content}));
+        }
+    }
+    if !pending.is_empty() {
+        return Err("unanswered tool calls");
+    }
+    Ok((normalized, has_history))
 }
 
 pub(super) fn strict_json(data: &[u8]) -> Result<Value, &'static str> {
