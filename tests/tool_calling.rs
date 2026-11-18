@@ -18,6 +18,9 @@ struct Running {
 }
 impl Running {
     async fn start(allowed: Vec<String>) -> Option<Self> {
+        Self::start_with_timeout(allowed, Duration::from_secs(10)).await
+    }
+    async fn start_with_timeout(allowed: Vec<String>, timeout: Duration) -> Option<Self> {
         let binary = std::env::var("H2A_HARNESS_FIXTURE").ok()?;
         let dir = tempfile::tempdir().unwrap();
         let store = auth::Store::new(dir.path());
@@ -42,7 +45,7 @@ impl Running {
                 })
                 .unwrap(),
             ],
-            timeout: Duration::from_secs(10),
+            timeout,
             max_concurrent: 2,
             allowed_models: allowed,
         })
@@ -413,5 +416,44 @@ async fn parallel_calls_stream_with_distinct_ids_and_indexes() {
     );
     assert!(stream.contains("data: [DONE]"));
     assert_eq!(s.accepted(), 1);
+    s.end().await;
+}
+
+#[tokio::test]
+async fn timeout_and_revocation_do_not_expose_buffered_output() {
+    let Some(s) = Running::start_with_timeout(vec![], Duration::from_millis(300)).await else {
+        return;
+    };
+    let r = s
+        .post("/v1/chat/completions", body("codex/emit-hang", true))
+        .send()
+        .await
+        .unwrap();
+    let text = tokio::time::timeout(Duration::from_secs(4), r.text())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(text.contains("harness_timeout"));
+    assert!(!text.contains("[DONE]"));
+    assert!(!text.contains("h2a-"));
+    assert_eq!(s.accepted(), 1);
+    s.end().await;
+    let Some(s) = Running::start(vec![]).await else {
+        return;
+    };
+    let r = s
+        .post("/v1/chat/completions", body("codex/emit-hang", true))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(s.accepted(), 1);
+    s.store.revoke(&s.id).unwrap();
+    let text = tokio::time::timeout(Duration::from_secs(4), r.text())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(text.contains("invalid_api_key"));
+    assert!(!text.contains("[DONE]"));
+    assert!(!text.contains("h2a-"));
     s.end().await;
 }
