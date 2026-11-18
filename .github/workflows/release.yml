@@ -10,6 +10,7 @@ on:
       - 'scripts/check_readme.py'
       - 'scripts/check-example-docs.py'
       - 'scripts/check-tool-calling.py'
+      - 'examples/tool-calling/**'
       - 'scripts/stage-installers.py'
       - 'scripts/install_tests/**'
       - 'scripts/check-init.py'
