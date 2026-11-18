@@ -1,5 +1,6 @@
 mod models;
 mod request;
+mod tools;
 mod transport;
 pub use models::{ModelError, allows, check_model, validate_models};
 
@@ -286,15 +287,24 @@ impl Server {
             model: model.to_string(),
             prompt: req.prompt,
         };
+        let bridge = req.bridge;
         let (sender, mut events) = mpsc::channel(8);
         let request_id = request_id.to_string();
         self.tasks.spawn(async move {
             let cancel = lease.cancellation();
             let (delta_tx,delta_rx) = mpsc::channel(8);
-            let result = forward_output(adapter.run(input,cancel.clone(),delta_tx), delta_rx, &sender, &cancel).await;
+            let mut buffered = bridge.as_ref().map(|_| String::new());
+            let result = forward_output(adapter.run(input,cancel.clone(),delta_tx), delta_rx, &sender, &cancel, &mut buffered).await;
             // The adapter has reaped its child before the lease can be released.
             let result = match (result,lease.cause()) {
-                (Ok(usage),None) => Event::Finished(usage),
+                (Ok(usage),None) => {
+                    if let (Some(bridge), Some(buffered)) = (bridge, buffered) {
+                        match bridge.validate(buffered.as_bytes()) {
+                            Ok(message) => { let _ = sender.send(Event::Message(message)).await; Event::Finished(usage) },
+                            Err(_) => Event::Failed((502,"invalid_harness_output","Harness returned invalid structured output.")),
+                        }
+                    } else { Event::Finished(usage) }
+                },
                 (_,cause) => { let e = run_error(cause); eprintln!("{}",json!({"level":"ERROR","msg":"request failed","request_id":request_id,"code":e.1})); Event::Failed(e) },
             };
             let _ = sender.send(result).await;
@@ -310,14 +320,21 @@ impl Server {
         if req.stream {
             let stream = async_stream::stream! {
                 let _guard = guard;
-                if chat { yield Ok::<Bytes,Infallible>(sse(chunk(&id,created,&model,chat,json!({"role":"assistant","content":""}),false,req.include_usage))); }
+                if chat { yield Ok::<Bytes,Infallible>(sse(chunk(&id,created,&model,chat,json!({"role":"assistant","content":""}),None,req.include_usage))); }
+                let mut finish_reason = "stop";
                 let mut heartbeat = tokio::time::interval(Duration::from_secs(15)); heartbeat.tick().await;
                 loop {
                     tokio::select! {
                         event = events.recv() => match event {
-                            Some(Event::Text(text)) => yield Ok(sse(chunk(&id,created,&model,chat,json!({"content":text}),false,req.include_usage))),
+                            Some(Event::Message(message)) => {
+                                match message {
+                                    tools::Outcome::Calls(calls) => { finish_reason = "tool_calls"; for (index, call) in calls.iter().enumerate() { let mut call = call.wire(); call["index"] = json!(index); yield Ok(sse(chunk(&id,created,&model,chat,json!({"tool_calls":[call]}),None,req.include_usage))); } },
+                                    tools::Outcome::Text(text) => yield Ok(sse(chunk(&id,created,&model,chat,json!({"content":text}),None,req.include_usage))),
+                                }
+                            }
+                            Some(Event::Text(text)) => yield Ok(sse(chunk(&id,created,&model,chat,json!({"content":text}),None,req.include_usage))),
                             Some(Event::Finished(usage)) => {
-                                yield Ok(sse(chunk(&id,created,&model,chat,json!({}),true,req.include_usage)));
+                                yield Ok(sse(chunk(&id,created,&model,chat,json!({}),Some(finish_reason),req.include_usage)));
                                 if req.include_usage && let Some(usage) = usage { yield Ok(sse(json!({"id":id,"created":created,"model":model,"object":if chat {"chat.completion.chunk"} else {"text_completion"},"choices":[],"usage":usage}))); }
                                 yield Ok(Bytes::from_static(b"data: [DONE]\n\n")); break;
                             }
@@ -336,14 +353,22 @@ impl Server {
         }
         let _guard = guard;
         let mut text = String::new();
+        let mut message = None;
         while let Some(event) = events.recv().await {
             match event {
                 Event::Text(delta) => text.push_str(&delta),
+                Event::Message(value) => message = Some(value),
                 Event::Failed((status, code, message)) => return failure(status, code, message),
                 Event::Finished(usage) => {
                     let mut choice = json!({"index":0,"finish_reason":"stop","logprobs":null});
                     if chat {
-                        choice["message"] = json!({"role":"assistant","content":text});
+                        let message = message
+                            .map(|outcome: tools::Outcome| outcome.message())
+                            .unwrap_or_else(|| json!({"role":"assistant","content":text}));
+                        if message.get("tool_calls").is_some() {
+                            choice["finish_reason"] = json!("tool_calls");
+                        }
+                        choice["message"] = message;
                     } else {
                         choice["text"] = json!(text);
                     }
@@ -396,6 +421,7 @@ async fn forward_output(
     mut deltas: mpsc::Receiver<String>,
     sender: &mpsc::Sender<Event>,
     cancel: &CancellationToken,
+    buffered: &mut Option<String>,
 ) -> Result<Option<harness::Usage>, harness::Error> {
     tokio::pin!(run);
     let mut finished = None;
@@ -421,9 +447,11 @@ async fn forward_output(
                         if finished.is_none() { let _ = run.await; }
                         return Err(harness::Error::OutputLimit);
                     }
-                    tokio::select! {
-                        _ = cancel.cancelled() => {},
-                        sent = sender.send(Event::Text(delta)) => { if sent.is_err() { cancel.cancel(); } }
+                    if let Some(buffer) = buffered { buffer.push_str(&delta); } else {
+                        tokio::select! {
+                            _ = cancel.cancelled() => {},
+                            sent = sender.send(Event::Text(delta)) => { if sent.is_err() { cancel.cancel(); } }
+                        }
                     }
                 }
             }
@@ -435,6 +463,7 @@ async fn forward_output(
 type RunError = (u16, &'static str, &'static str);
 enum Event {
     Text(String),
+    Message(tools::Outcome),
     Finished(Option<harness::Usage>),
     Failed(RunError),
 }
@@ -519,11 +548,10 @@ fn chunk(
     model: &str,
     chat: bool,
     delta: Value,
-    stop: bool,
+    stop: Option<&str>,
     usage: bool,
 ) -> Value {
-    let mut choice =
-        json!({"index":0,"finish_reason":if stop {json!("stop")}else{Value::Null},"logprobs":null});
+    let mut choice = json!({"index":0,"finish_reason":stop,"logprobs":null});
     if chat {
         choice["delta"] = delta;
     } else {
@@ -549,7 +577,7 @@ mod forwarding_tests {
             deltas.send("last".into()).await.unwrap();
             Ok(None)
         };
-        let result = forward_output(run, rx, &sender, &CancellationToken::new()).await;
+        let result = forward_output(run, rx, &sender, &CancellationToken::new(), &mut None).await;
         assert!(result.is_ok());
         drop(sender);
         let mut text = String::new();

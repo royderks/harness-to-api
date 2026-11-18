@@ -6,7 +6,7 @@ These choices define the architecture of harness-to-api. Changes to them belong 
 
 - Use Rust for a single native gateway binary. Keep HTTP, admission, provider protocols, and protected storage in distinct modules within one Cargo package.
 - Invoke documented harness CLI protocols and retain their normal login paths. Do not extract OAuth tokens or use private provider endpoints.
-- Support text chat completions, legacy completions, model listing, and SSE. Reject unsupported fields rather than silently dropping them.
+- Support text chat completions, client-owned function calls, legacy completions, model listing, and SSE. Reject unsupported fields rather than silently dropping them.
 - Keep provider-specific parsing and execution restrictions in adapters. Keep HTTP behavior and key policy independent of the provider.
 - Use harness-to-api as the project name and `h2a` as the executable.
 
@@ -48,3 +48,11 @@ See [architecture](docs/architecture.md), [key policies](docs/policies.md), [onb
 - Keep human guides and agent instructions in repository Markdown. Generate the public site and its downloadable Markdown from those same sources; no separate CMS.
 - Run annotated agent quickstart commands against the offline gateway in CI. Ordinary prose edits need documentation checks; executable quickstart edits also require native lifecycle checks.
 - Publish verified native archives before changing public installer defaults. Keep fixture proof distinct from live harness access and cloud sandbox results.
+
+## Client function tools
+
+- Extend the existing Chat Completions route with OpenAI-shaped function definitions, calls and results. Applications execute their own allowlisted functions; h2a never dispatches them on the gateway host.
+- Use one API-owned structured-output bridge across the existing harness text protocols. Per-harness native interception was considered but does not establish the required stateless stop/replay behavior across supported CLIs. Retain existing harness restrictions and native-tool event handling.
+- Validate requests and supported schemas before admission. Buffer and validate generated tool turns before exposing calls; return an explicit error on invalid output without repair retries. Streaming tool turns use standard indexed deltas after validation.
+- Treat strict schemas as a validate-or-error response contract, not a promise of native constrained decoding or model reliability. Document the exact schema subset and reject unsupported keywords. Tool results and model-generated arguments remain untrusted data.
+- Keep CLI capability probes explicit and quota-consuming. Do not add extra inference to ordinary onboarding. Test actual SDK and framework tool loops, including failures, separately from live-provider compatibility.

@@ -78,3 +78,12 @@ Linux and macOS use advisory file locks, file synchronization, atomic rename, an
 ## Extension rule
 
 Add a new constraint to the existing admission operation and its behavioral tests. Do not add a second quota check in a handler, a separate probe execution path, or a second writer of key records. Add provider-specific behavior behind the existing adapter interface.
+
+
+## Client function tools
+
+The API owns function definitions, choice constraints, conversation correlation, schema validation, and OpenAI response framing. A tool turn becomes a fixed structured-output instruction plus an escaped conversation payload sent through the unchanged harness adapter. The harness's internal tool events are not exposed as client function calls. No caller-provided function name or argument becomes a process command.
+
+The API buffers a tool turn's assistant output within the existing output bound and validates its terminal envelope. Only then can it emit text or indexed tool-call deltas. Invalid output fails without a hidden retry; the admitted request remains counted. The same tracked supervisor retains the admission lease through cancellation and child cleanup. The next HTTP request carries the caller's tool result and is admitted independently. h2a stores no tool-loop session and performs no client function execution.
+
+This bridge provides validated wire output, not provider-native constrained decoding, guaranteed instruction hierarchy, or factual correctness. Clients remain responsible for validating intent and authorizing effects. The [API reference](api.md#client-function-tools) defines the supported subset.

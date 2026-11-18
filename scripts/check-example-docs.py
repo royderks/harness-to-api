@@ -16,13 +16,13 @@ def check(root):
     manifest = json.loads((examples / 'commands.json').read_text())
     errors = []
     directories = {p.name for p in examples.iterdir() if p.is_dir() and p.name not in {'tests', '__pycache__'}}
-    expected_examples = {'agents-sdk', 'docker', 'e2b', 'harness-switch', 'langgraph', 'modal', 'openshell'}
+    expected_examples = {'agents-sdk', 'docker', 'e2b', 'harness-switch', 'langgraph', 'modal', 'openshell', 'tool-calling'}
     if set(manifest) != expected_examples:
-        errors.append('manifest must cover all seven examples')
+        errors.append('manifest must cover all supported examples')
     if directories != set(manifest):
         errors.append(f'example directories and manifest differ: {sorted(directories ^ set(manifest))}')
-    if {name for name, entry in manifest.items() if entry['offline']} != {'harness-switch', 'langgraph', 'agents-sdk'}:
-        errors.append('offline examples must be the three local SDK clients')
+    if {name for name, entry in manifest.items() if entry['offline']} != {'harness-switch', 'langgraph', 'agents-sdk', 'tool-calling'}:
+        errors.append('offline examples must be the local SDK clients')
     requirements = {line.split('==')[0] for line in (examples / 'requirements.txt').read_text().splitlines() if '==' in line}
     for name, entry in manifest.items():
         readme = examples / name / 'README.md'
@@ -34,9 +34,12 @@ def check(root):
                     for i, command in enumerate(entry['commands'])}
         for command in entry['commands']:
             allowed_commands = {f'python examples/{name}/main.py'}
+            if name == 'tool-calling':
+                allowed_commands = {f'python examples/tool-calling/{script}.py{suffix}'
+                                    for script in ('main', 'agent') for suffix in (('', ' --stream') if script == 'main' else ('',))}
             if name == 'openshell':
                 allowed_commands.add('python examples/openshell/main.py --local')
-            if command.startswith('python examples/') and (command not in allowed_commands or not (examples / name / 'main.py').is_file()):
+            if command.startswith('python examples/') and (command not in allowed_commands or not (root / command.split()[1]).is_file()):
                 errors.append(f'{name}: invalid Python launch command')
         blocks = BLOCK.findall(content)
         if len(blocks) != len(expected) or dict(blocks) != expected:
@@ -44,7 +47,7 @@ def check(root):
         for dep in entry['dependencies']:
             if dep not in requirements or dep not in content:
                 errors.append(f'{name}: dependency {dep} missing from requirements or README')
-        if entry['offline'] and (len(entry['commands']) != 1 or not re.fullmatch(r'python examples/[\w-]+/main\.py', entry['commands'][0])):
+        if entry['offline'] and name != 'tool-calling' and (len(entry['commands']) != 1 or not re.fullmatch(r'python examples/[\w-]+/main\.py', entry['commands'][0])):
             errors.append(f'{name}: offline command must be a direct Python invocation')
     known_commands = {command for entry in manifest.values() for command in entry['commands']}
     for readme in examples.rglob('README.md'):

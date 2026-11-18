@@ -8,6 +8,7 @@ and sandboxes. Start with one local example; add a remote sandbox after it works
 | [Harness switching](harness-switch/) | Stream the same prompt through different harnesses using the OpenAI Python SDK | One per selected model | Each selected harness's login |
 | [LangGraph](langgraph/) | Draft with one harness, review with another in a fixed two-step graph | 2 | None beyond harness login |
 | [OpenAI Agents SDK](agents-sdk/) | Run a text-only agent through Chat Completions | 1 | No OpenAI API account required |
+| [Client function tools](tool-calling/) | OpenAI and Agents SDK tool loops, including streaming | 2 | None beyond harness login |
 | [Docker](docker/) | Run the client in a container, leaving harness login on the host | 1 | None for local Docker; remote route needed |
 | [OpenShell](openshell/) | Use h2a as an endpoint-bound inference provider | 1 | None for local OpenShell; Docker required |
 | [E2B](e2b/) | A hosted sandbox calls your host using a scoped gateway key | 1 | E2B account and API key |
@@ -89,10 +90,8 @@ isolate that host. See [execution boundaries](../docs/architecture.md).
 ## API contract for developers and coding agents
 
 - Send `model` as `provider/model` and text `messages` to `/v1/chat/completions`.
-- Use `stream: true` for SSE. No Responses API, tool calls, structured-output
-  schema, `temperature`, `max_tokens`, or other sampling fields.
-- The framework examples orchestrate text steps. They are not drop-in backends
-  for a tool-using agent. No request fields are silently stripped.
+- Use `stream: true` for SSE. The [tool-calling recipe](tool-calling/) supports client-owned function loops through Chat Completions. Tool turns buffer output until validated.
+- No Responses API, response-format schema, `temperature`, `max_tokens`, or other sampling fields. No request fields are silently stripped. Read the [API contract](../docs/api.md) for the function schema subset and validate-or-error semantics. Tool support requires a source build containing this feature; v0.1.0 is text-only.
 - `_client.py` holds shared configuration and the dependency-free HTTP client
   copied into sandboxes. It rejects redirects and requires HTTPS outside literal
   loopback. SDK clients also disable redirects, proxy environment inheritance,
@@ -124,3 +123,5 @@ same documented commands for the three local SDK examples. It does not replay
 setup or run Docker, OpenShell, E2B, or Modal commands. OpenShell's checked
 blocks describe manual profile, provider, sandbox, and cleanup operations; the
 check does not execute or validate those resources.
+
+The three tool-calling commands run separately with `python scripts/check-tool-calling.py`, using the same `H2A_BIN` and `H2A_FIXTURE` variables. That checker exercises the real SDK clients and gateway; fixtures do not establish live model compliance.

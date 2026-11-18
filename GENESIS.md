@@ -1,6 +1,6 @@
 # Product intent
 
-harness-to-api exposes installed coding harnesses through an authenticated, OpenAI-compatible text-completion API. The command is `h2a`.
+harness-to-api exposes installed coding harnesses through an authenticated, OpenAI-compatible chat and text-completion API. The command is `h2a`.
 
 ## G1. Make installed coding harnesses usable through an API
 
@@ -32,4 +32,4 @@ Accept contributions from people and coding agents through GitHub. Reactions com
 
 ## Scope
 
-The gateway supports text completions. It is not a full OpenAI API implementation, billing service, provider-quota oracle, or distributed worker scheduler. See [API compatibility](docs/api.md), [architecture](docs/architecture.md), and [contribution guidelines](CONTRIBUTING.md).
+The gateway supports text completions and client-owned function-tool loops through Chat Completions. It is not a full OpenAI API implementation, billing service, provider-quota oracle, or distributed worker scheduler. See [API compatibility](docs/api.md), [architecture](docs/architecture.md), and [contribution guidelines](CONTRIBUTING.md).

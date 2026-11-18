@@ -23,3 +23,8 @@ Expose h2a as an endpoint-bound inference provider while the harness runs on the
 h2a supports text chat completions, legacy completions, model listing, and streaming. It rejects unsupported API fields. Gateway keys can limit models, expiry, accepted requests, rate, duration, and concurrency; they do not limit provider billing or isolate host-side harness execution.
 
 Explore the [API](api.md), [key policies](policies.md), [remote access](remote-access.md), and [examples](../examples/README.md).
+
+
+## Give your agent a function
+
+The [client tool-calling recipe](../examples/tool-calling/README.md) shows a two-turn loop through the OpenAI SDK and Agents SDK. The gateway proposes a function call; the application executes its allowlisted function and returns the result. See the [API contract](api.md#client-function-tools) for the supported schema subset and validation boundary. Use a source build containing this feature; v0.1.0 remains text-only.

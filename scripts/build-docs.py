@@ -19,7 +19,7 @@ PAGES = {
     'docs/agent-quickstart.md': ('agent-quickstart/index.html', 'Agent quickstart'),
     'examples/README.md': ('examples/index.html', 'Examples'),
     **{f'examples/{name}/README.md': (f'examples/{name}/index.html', title) for name, title in [
-        ('harness-switch', 'Harness switching'), ('langgraph', 'LangGraph'), ('agents-sdk', 'OpenAI Agents SDK'),
+        ('tool-calling', 'Client function tools'), ('harness-switch', 'Harness switching'), ('langgraph', 'LangGraph'), ('agents-sdk', 'OpenAI Agents SDK'),
         ('docker', 'Docker'), ('openshell', 'OpenShell'), ('e2b', 'E2B'), ('modal', 'Modal')]},
     **{f'docs/{name}.md': (f'{name}/index.html', title) for name, title in [
         ('api', 'API reference'), ('cli', 'CLI reference'), ('policies', 'Key policies'),
