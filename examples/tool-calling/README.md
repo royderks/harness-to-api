@@ -22,8 +22,6 @@ python examples/tool-calling/agent.py
 ```
 <!-- /example-command -->
 
-
-
 Each flow makes two accepted completion requests and executes `lookup_status`
 once locally against a fixed registry. h2a proposes calls; it does not execute
 client functions. The Agents SDK uses Chat Completions and disables tracing.

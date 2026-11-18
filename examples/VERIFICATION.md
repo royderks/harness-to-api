@@ -68,3 +68,18 @@ reports. No real harness, E2B or Modal live verification is claimed. A subsequen
 [OpenShell local integration](../docs/openshell-live.md#verification) exercised real
 sandboxes with fixture output, quota denial, revocation and cleanup. OpenShell is executable on a configured trusted host; the hosted
 workflow does not provision its gateway. See [testing and account setup](../docs/examples-testing.md).
+
+## Client function tools verified 2026-11-17
+
+The direct OpenAI SDK streaming and nonstreaming recipes and the nonstreaming
+Agents SDK recipe run against the real gateway with canned harness output in CI.
+Each executes one local `lookup_status` function across two accepted requests.
+The checker also verifies quota refusal, revocation and the explicit tool probe.
+Runtime fixtures exercise tool-call responses through all six adapters.
+
+One live nonstreaming direct-SDK loop passed with Codex CLI `0.165.0`, model alias
+`codex/default`, and gateway source `7a9894af855e8f1e70f25221e28fb218642f9b55`.
+Codex proposed the call, the client ran the fixed local lookup, and Codex returned
+the final answer after receiving its result. Exactly two requests were accepted;
+the temporary key was revoked and the gateway stopped afterward. This does not
+establish live streaming, other harnesses, or every model's reliability.
