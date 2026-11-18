@@ -91,6 +91,44 @@ enum Kind {
     Boolean,
     Null,
 }
+// Compare decimal values without rounding large integers through f64.
+fn decimal(number: &serde_json::Number) -> (bool, String, i32) {
+    let text = number.to_string();
+    let negative = text.starts_with('-');
+    let unsigned = text.trim_start_matches('-');
+    let (mantissa, exponent) = unsigned.split_once('e').unwrap_or((unsigned, "0"));
+    let fractional = mantissa.split_once('.').map_or(0, |(_, s)| s.len());
+    let mut exponent = exponent.parse::<i32>().unwrap() - fractional as i32;
+    let mut digits = mantissa.replace('.', "").trim_start_matches('0').to_owned();
+    if digits.is_empty() {
+        return (false, String::new(), 0);
+    }
+    while digits.ends_with('0') {
+        digits.pop();
+        exponent += 1;
+    }
+    (negative, digits, exponent)
+}
+
+fn enum_equal(left: &Value, right: &Value, budget: &mut usize) -> bool {
+    if *budget == 0 {
+        return false;
+    }
+    *budget -= 1;
+    match (left, right) {
+        (Value::Number(a), Value::Number(b)) => decimal(a) == decimal(b),
+        (Value::Array(a), Value::Array(b)) => {
+            a.len() == b.len() && a.iter().zip(b).all(|(a, b)| enum_equal(a, b, budget))
+        }
+        (Value::Object(a), Value::Object(b)) => {
+            a.len() == b.len()
+                && a.iter()
+                    .all(|(key, a)| b.get(key).is_some_and(|b| enum_equal(a, b, budget)))
+        }
+        _ => left == right,
+    }
+}
+
 impl Schema {
     fn parse(v: &Value, depth: usize, strict: bool) -> Result<Self, &'static str> {
         if depth > 16 {
@@ -214,7 +252,10 @@ impl Schema {
             return false;
         }
         *budget -= 1;
-        if self.enumeration.as_ref().is_some_and(|e| !e.contains(v))
+        if self
+            .enumeration
+            .as_ref()
+            .is_some_and(|e| !e.iter().any(|candidate| enum_equal(candidate, v, budget)))
             || (!self.any_of.is_empty() && !self.any_of.iter().any(|s| s.matches(v, budget)))
         {
             return false;
@@ -411,6 +452,40 @@ impl Bridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn enum_numbers_compare_by_value_recursively_without_integer_rounding() {
+        for (schema, value) in [
+            (json!({"type":"integer","enum":[1]}), json!(1.0)),
+            (json!({"enum":[1.0]}), json!(1)),
+            (json!({"enum":[0]}), json!(-0.0)),
+            (json!({"enum":[1000]}), json!(1e3)),
+            (
+                json!({"enum":[{"values":[1,-2,0]}]}),
+                json!({"values":[1.0,-2.0,-0.0]}),
+            ),
+        ] {
+            assert!(
+                Schema::parse(&schema, 0, false)
+                    .unwrap()
+                    .matches(&value, &mut 100_000)
+            );
+        }
+        for (expected, actual) in [
+            (json!(1), json!(1.5)),
+            (json!(9007199254740993_u64), json!(9007199254740992.0)),
+            (
+                json!(18446744073709551615_u64),
+                json!(18446744073709551614_u64),
+            ),
+            (json!({"values":[1,2]}), json!({"values":[1.0,3.0]})),
+        ] {
+            let schema = Schema::parse(&json!({"enum":[expected]}), 0, false).unwrap();
+            assert!(!schema.matches(&actual, &mut 100_000));
+        }
+        let schema = Schema::parse(&json!({"enum":[[1,2,3]]}), 0, false).unwrap();
+        assert!(!schema.matches(&json!([1.0, 2.0, 3.0]), &mut 3));
+    }
 
     #[test]
     fn compiled_schema_validates_nested_values_and_rejects_unsupported_keywords() {
