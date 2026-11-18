@@ -73,6 +73,6 @@
       "openai",
       "openai-agents"
     ],
-    "offline": false
+    "offline": true
   }
 }
