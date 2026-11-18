@@ -8,18 +8,19 @@ pub async fn run(args: &[String]) -> anyhow::Result<()> {
     if args::help(args) {
         super::command_help(
             "probe",
-            "  --base-url http://127.0.0.1:8787/v1\n  --model provider/model",
+            "  --base-url http://127.0.0.1:8787/v1\n  --model provider/model\n  --tool-call  Verify one client function call without executing it",
         );
         return Ok(());
     }
-    let f = Flags::parse(args, &["base-url", "model"], &[])?;
+    let f = Flags::parse(args, &["base-url", "model"], &["tool-call"])?;
     f.only_flags()?;
     let token = std::env::var("OPENAI_API_KEY").unwrap_or_default();
-    let result = execute(
+    let result = execute_mode(
         f.get("base-url", "http://127.0.0.1:8787/v1"),
         f.get("model", ""),
         &token,
         CancellationToken::new(),
+        f.boolean("tool-call"),
     )
     .await?;
     println!("{result}");
@@ -34,6 +35,16 @@ pub async fn execute(
     model: &str,
     token: &str,
     cancel: CancellationToken,
+) -> anyhow::Result<Value> {
+    execute_mode(base, model, token, cancel, false).await
+}
+
+async fn execute_mode(
+    base: &str,
+    model: &str,
+    token: &str,
+    cancel: CancellationToken,
+    tool_call: bool,
 ) -> anyhow::Result<Value> {
     anyhow::ensure!(auth::valid_model(model), "--model must be provider/model");
     let mut url = reqwest::Url::parse(base).map_err(|_| anyhow::anyhow!("invalid probe URL"))?;
@@ -68,11 +79,23 @@ pub async fn execute(
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let mut result = json!({"checked_at":checked,"model":model,"available":false});
+    if tool_call {
+        result["capability"] = json!("tool_call");
+    }
+    let mut request =
+        json!({"model":model,"messages":[{"role":"user","content":"Reply with OK."}]});
+    if tool_call {
+        request["messages"][0]["content"] =
+            json!("Call h2a_probe once with an empty object. Do not execute any tools yourself.");
+        request["tools"] = json!([{"type":"function","function":{"name":"h2a_probe","description":"Propose a client-side capability check. The client will not execute it.","parameters":{"type":"object","properties":{},"required":[],"additionalProperties":false}}}]);
+        request["tool_choice"] = json!({"type":"function","function":{"name":"h2a_probe"}});
+        request["parallel_tool_calls"] = json!(false);
+    }
     let attempt = async {
         let mut response = client
             .post(url)
             .bearer_auth(token)
-            .json(&json!({"model":model,"messages":[{"role":"user","content":"Reply with OK."}]}))
+            .json(&request)
             .send()
             .await
             .ok()?;
@@ -90,14 +113,43 @@ pub async fn execute(
             && body["object"] == "chat.completion"
             && body["model"] == model
             && body["choices"].as_array().is_some_and(|c| c.len() == 1)
-            && body["choices"][0]["finish_reason"] == "stop"
-            && body["choices"][0]["message"]["role"] == "assistant"
-            && body["choices"][0]["message"]["content"]
-                .as_str()
-                .is_some_and(|s| !s.trim().is_empty());
+            && valid_choice(&body["choices"][0], tool_call);
         result["available"] = json!(valid);
         Some(())
     };
     tokio::select! {_ = cancel.cancelled()=>{},_ = attempt=>{}}
     Ok(result)
+}
+
+fn valid_choice(choice: &Value, tool_call: bool) -> bool {
+    let message = &choice["message"];
+    if message["role"] != "assistant" {
+        return false;
+    }
+    if !tool_call {
+        return choice["finish_reason"] == "stop"
+            && message["tool_calls"]
+                .as_array()
+                .is_none_or(|calls| calls.is_empty())
+            && message["content"]
+                .as_str()
+                .is_some_and(|s| !s.trim().is_empty());
+    }
+    if choice["finish_reason"] != "tool_calls" {
+        return false;
+    }
+    let Some(calls) = message["tool_calls"]
+        .as_array()
+        .filter(|calls| calls.len() == 1)
+    else {
+        return false;
+    };
+    let call = &calls[0];
+    call["id"].as_str().is_some_and(|id| !id.trim().is_empty())
+        && call["type"] == "function"
+        && call["function"]["name"] == "h2a_probe"
+        && call["function"]["arguments"]
+            .as_str()
+            .and_then(|s| serde_json::from_str::<Value>(s).ok())
+            .is_some_and(|v| v.as_object().is_some_and(|o| o.is_empty()))
 }
