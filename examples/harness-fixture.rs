@@ -171,30 +171,78 @@ fn main() {
     {
         std::process::exit(10)
     }
+    let prompt = if provider == "agy" {
+        serde_json::from_str::<serde_json::Value>(&input)
+            .ok()
+            .and_then(|v| v["message"]["content"].as_str().map(str::to_owned))
+            .unwrap_or_default()
+    } else {
+        input.clone()
+    };
+    let bridge_output = if let Some((_, data)) = prompt.split_once("H2A_CLIENT_TOOLS_V1\n") {
+        let data = data
+            .lines()
+            .last()
+            .and_then(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .unwrap_or_default();
+        let history = data["conversation"].as_array().unwrap();
+        let output = if history.last().is_some_and(|m| m["role"] == "tool") {
+            let result = history.last().unwrap();
+            let id = result["tool_call_id"].as_str().unwrap();
+            if !history.iter().any(|m| {
+                m["tool_calls"]
+                    .as_array()
+                    .is_some_and(|calls| calls.iter().any(|c| c["id"] == id))
+            }) {
+                std::process::exit(11);
+            }
+            json!({"version":1,"kind":"text","content":"Service api is healthy."}).to_string()
+        } else if mode == "bridge-malformed" {
+            "{invalid".to_string()
+        } else if mode == "bridge-duplicate" {
+            r#"{"version":1,"kind":"text","content":"secret","content":"x"}"#.to_string()
+        } else if mode == "bridge-text" {
+            json!({"version":1,"kind":"text","content":"fixture answer"}).to_string()
+        } else {
+            let tools = data["tools"].as_array().unwrap();
+            let tool = tools.first().unwrap();
+            let name = tool["function"]["name"].as_str().unwrap();
+            let arguments = if name == "h2a_probe" {
+                json!({})
+            } else {
+                json!({"service":"api"})
+            };
+            json!({"version":1,"kind":"tool_calls","calls":[{"name":if mode == "bridge-unknown" {"unknown"} else {name},"arguments":arguments}]}).to_string()
+        };
+        Some(output)
+    } else {
+        None
+    };
+    let text = bridge_output.as_deref().unwrap_or("Hello 🌍");
     let events = match provider {
         "codex" => vec![
-            json!({"type":"item.completed","item":{"type":"agent_message","text":"Hello 🌍"}}),
+            json!({"type":"item.completed","item":{"type":"agent_message","text":text}}),
             json!({"type":"turn.completed","usage":{"input_tokens":5,"output_tokens":2}}),
         ],
         "agy" => vec![
-            json!({"event":"step_update","step_update":{"step_type":"agent_response","text_delta":"Hello 🌍"}}),
-            json!({"event":"result","result":{"status":if mode=="failed" {"ERROR"} else {"SUCCESS"},"response":"Hello 🌍","usage":{"input_tokens":5,"output_tokens":2,"total_tokens":7}}}),
+            json!({"event":"step_update","step_update":{"step_type":"agent_response","text_delta":text}}),
+            json!({"event":"result","result":{"status":if mode=="failed" {"ERROR"} else {"SUCCESS"},"response":text,"usage":{"input_tokens":5,"output_tokens":2,"total_tokens":7}}}),
         ],
         "bob" => vec![
             json!({"type":"message_start","message":{"role":"assistant","provider":if mode=="wrong-provider" {"other"} else {"ibm-bob"},"model":mode}}),
-            json!({"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"Hello 🌍"}}),
+            json!({"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":text}}),
             json!({"type":"message_end","message":{"role":"assistant","provider":"ibm-bob","model":mode,"stopReason":if mode=="failed" {"error"} else {"stop"},"usage":{"input":3,"output":2,"cacheRead":2,"totalTokens":7}}}),
         ],
         "gemini" => vec![
-            json!({"type":"message","role":"assistant","content":"Hello 🌍"}),
+            json!({"type":"message","role":"assistant","content":text}),
             json!({"type":"result","status":"success","stats":{"input_tokens":5,"output_tokens":2,"total_tokens":7}}),
         ],
         "claude" => vec![
-            json!({"type":"assistant","message":{"content":[{"type":"text","text":"Hello 🌍"}]}}),
+            json!({"type":"assistant","message":{"content":[{"type":"text","text":text}]}}),
             json!({"type":"result","subtype":"success","is_error":false,"usage":{"input_tokens":5,"output_tokens":2}}),
         ],
         _ => vec![
-            json!({"type":"text","part":{"type":"text","text":"Hello 🌍"}}),
+            json!({"type":"text","part":{"type":"text","text":text}}),
             json!({"type":"step_finish","part":{"type":"step-finish","reason":"stop","tokens":{"input":5,"output":2}}}),
         ],
     };
