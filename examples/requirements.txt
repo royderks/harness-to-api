@@ -1,7 +1,7 @@
-openai==3.49.0
+openai==3.50.0
 openai-agents==0.24.0
-langgraph==1.2.20
+langgraph==1.2.21
 e2b==2.63.0
-modal==1.6.3
+modal==1.6.4
 httpx==0.28.1
 typing-extensions==4.16.0
