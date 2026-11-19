@@ -7,6 +7,8 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
+import sys
 import signal
 import socket
 import subprocess
@@ -82,6 +84,15 @@ def main():
         spec.loader.exec_module(example_docs)
         if example_docs.check(extracted):
             raise RuntimeError("Packaged example commands, dependencies or links are invalid")
+        for filename, pattern in (
+            ("install.sh", r"(?m)^    version=(v[0-9]+\.[0-9]+\.[0-9]+)$"),
+            ("install.ps1", r"(?m)^    \$version = '(v[0-9]+\.[0-9]+\.[0-9]+)'$"),
+        ):
+            if re.findall(pattern, (extracted / filename).read_text()) != [args.version]:
+                raise RuntimeError("Bundled installer does not target the archive version")
+        if os.name == "posix":
+            subprocess.run([sys.executable, str(extracted / "scripts/check-quickstart.py"),
+                            "--h2a", str(binary), "--fixture", str(fixture)], check=True, timeout=120)
         state = root / "state"
         text_token = cli("keys", "create", "--state-dir", str(state), "--models", "codex/default", "--ttl", "5m", "--max-requests", "1")
         text_identifier = text_token.split("_")[1]
@@ -200,7 +211,9 @@ def main():
             logs = log.read()
             if token in logs or text_token in logs:
                 raise RuntimeError("Credential found in gateway logs")
-    evidence = {"version": args.version, "target": args.target, "system": platform.system(), "machine": machine, "archive": archive.name, "sha256": digest, "checks": ["checksum", "extract", "version", "help", "readme-command-reference", "example-documentation", "missing-key-401", "fixture-completion", "fixture-tool-call", "fixture-tool-replay", "quota-429", "durable-count", "revoked-key-401", "secret-free-logs"], "live_provider": False}
+    evidence = {"version": args.version, "target": args.target, "system": platform.system(), "machine": machine, "archive": archive.name, "sha256": digest, "checks": ["checksum", "extract", "version", "help", "readme-command-reference", "example-documentation", "bundled-installer-version", "missing-key-401", "fixture-completion", "fixture-tool-call", "fixture-tool-replay", "quota-429", "durable-count", "revoked-key-401", "secret-free-logs"], "live_provider": False}
+    if os.name == "posix":
+        evidence["checks"].append("documented-agent-quickstart-posix")
     (args.dist / f"verification_{args.version}_{name}.json").write_text(json.dumps(evidence, indent=2) + "\n")
     print("PASS " + name + ": extracted archive version, text, tool loop and bounded-key lifecycle")
 

@@ -39,10 +39,11 @@ fi
 python3 "$snapshot/scripts/stage-installers.py" "$version" --source "$snapshot" --output "dist/candidate-installers"
 mkdir -p "$folder"
 cp "target/$target/release/$executable" "$folder/"
-cp "$snapshot/LICENSE" "$snapshot/README.md" "$snapshot/CONTRIBUTING.md" "$snapshot/install.sh" "$snapshot/install.ps1" "$folder/"
+cp "$snapshot/LICENSE" "$snapshot/README.md" "$snapshot/CONTRIBUTING.md" "$folder/"
+cp dist/candidate-installers/install.sh dist/candidate-installers/install.ps1 "$folder/"
 cp -R "$snapshot/docs" "$snapshot/examples" "$folder/"
 mkdir -p "$folder/scripts"
-cp "$snapshot/scripts/check-example-docs.py" "$snapshot/scripts/check-tool-calling.py" "$folder/scripts/"
+cp "$snapshot/scripts/check-example-docs.py" "$snapshot/scripts/check-tool-calling.py" "$snapshot/scripts/check-quickstart.py" "$folder/scripts/"
 mkdir -p "$folder/demo"
 cp "$snapshot"/demo/*.py "$snapshot"/demo/*.sh "$folder/demo/"
 {
