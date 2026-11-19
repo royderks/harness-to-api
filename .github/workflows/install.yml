@@ -32,7 +32,7 @@ jobs:
           testdir=$(mktemp -d)
           trap 'rm -rf "$testdir"' EXIT
           H2A_INSTALL_ONLY=1 H2A_INSTALL_DIR="$testdir/bin" sh install.sh
-          test "$("$testdir/bin/h2a" version)" = v0.1.0
+          test "$("$testdir/bin/h2a" version)" = v0.1.1
       - name: Windows published binary and checksum refusal
         if: runner.os == 'Windows'
         shell: powershell

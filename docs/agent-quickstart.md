@@ -123,4 +123,4 @@ Repair revokes the recorded onboarding key and removes its profile and credentia
 
 Use the [tool-calling example](../examples/tool-calling/README.md) after your first text request succeeds. It covers the OpenAI SDK, streamed tool calls, and an Agents SDK function tool. Your client validates and executes an allowlisted function, then sends its result with the matching `tool_call_id`. Each model turn is a separate accepted request. Never execute a function merely because model output names it; the example limits dispatch to a local registry lookup.
 
-Read the [API function-tool contract](api.md#client-function-tools) for schema limits and buffered streaming. A successful `h2a probe --tool-call --model codex/default` checks one proposed call without executing it. Tool support requires the source version that adds these examples; the v0.1.0 installer release does not support it.
+Read the [API function-tool contract](api.md#client-function-tools) for schema limits and buffered streaming. A successful `h2a probe --tool-call --model codex/default` checks one proposed call without executing it. Tool support is included in v0.1.1; v0.1.0 does not support it.

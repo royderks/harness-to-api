@@ -27,4 +27,4 @@ Explore the [API](api.md), [key policies](policies.md), [remote access](remote-a
 
 ## Give your agent a function
 
-The [client tool-calling recipe](../examples/tool-calling/README.md) shows a two-turn loop through the OpenAI SDK and Agents SDK. The gateway proposes a function call; the application executes its allowlisted function and returns the result. See the [API contract](api.md#client-function-tools) for the supported schema subset and validation boundary. Use a source build containing this feature; v0.1.0 remains text-only.
+The [client tool-calling recipe](../examples/tool-calling/README.md) shows a two-turn loop through the OpenAI SDK and Agents SDK. The gateway proposes a function call; the application executes its allowlisted function and returns the result. See the [API contract](api.md#client-function-tools) for the supported schema subset and validation boundary. Install v0.1.1 for tool support; v0.1.0 remains text-only.

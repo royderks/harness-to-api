@@ -1,7 +1,7 @@
 # Keep the entry point last so a truncated download cannot start installation.
 function Install-H2a {
     $ErrorActionPreference = 'Stop'
-    $version = 'v0.1.0'
+    $version = 'v0.1.1'
     if ($env:OS -ne 'Windows_NT') { throw 'Use install.sh on macOS or Linux.' }
     $architecture = $env:PROCESSOR_ARCHITEW6432
     if (-not $architecture) { $architecture = $env:PROCESSOR_ARCHITECTURE }

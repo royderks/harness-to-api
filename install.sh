@@ -2,7 +2,7 @@
 # Keep the entry point last so a truncated download cannot start installation.
 h2a_install() (
     set -eu
-    version=v0.1.0
+    version=v0.1.1
     fail() { printf 'h2a: %s\n' "$*" >&2; exit 1; }
     case "$(uname -s)" in Darwin) os=darwin;; Linux) os=linux;; *) fail 'Use install.ps1 on Windows; this OS is unsupported.';; esac
     case "$(uname -m)" in arm64|aarch64) arch=arm64;; x86_64|amd64) arch=amd64;; *) fail 'Supported architectures: x86-64 and ARM64.';; esac

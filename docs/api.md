@@ -26,7 +26,7 @@ at every nesting level before admission. Use one value for each field.
 
 ## Client function tools
 
-Use the existing `POST /v1/chat/completions` route. Send OpenAI-shaped function definitions in `tools`; your application executes the selected function and sends its result in the next request. The [executable recipe](../examples/tool-calling/README.md) covers streaming and nonstreaming with the OpenAI SDK, plus a nonstreaming Agents SDK loop. This source feature is not present in v0.1.0.
+Use the existing `POST /v1/chat/completions` route. Send OpenAI-shaped function definitions in `tools`; your application executes the selected function and sends its result in the next request. The [executable recipe](../examples/tool-calling/README.md) covers streaming and nonstreaming with the OpenAI SDK, plus a nonstreaming Agents SDK loop. Client function tools are included in v0.1.1 and are not present in v0.1.0.
 
 ```json
 {

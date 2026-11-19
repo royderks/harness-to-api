@@ -10,7 +10,7 @@ the host.
 One native binary, `h2a`. No Rust toolchain needed. Your harness still needs its
 own installation and login.
 
-[Getting started](docs/getting-started.md) · [Give this to your agent](docs/agent-quickstart.md) · [Examples](examples/README.md) · [API reference](docs/api.md)
+[Documentation](https://royderks.github.io/harness-to-api/) · [Getting started](docs/getting-started.md) · [Give this to your agent](docs/agent-quickstart.md) · [Examples](examples/README.md) · [API reference](docs/api.md)
 
 ## Getting started
 
@@ -139,7 +139,7 @@ For command flags, use commands such as `h2a help serve` or `h2a keys create --h
 
 ## API and execution boundary
 
-Text chat completions, legacy completions, model listing, and SSE streaming are implemented. See [the API contract](docs/api.md) for supported fields and errors. Chat Completions also supports [client function tools](examples/tool-calling/README.md): your application executes the function and returns its result. Tool turns use a validated structured-output bridge, not native harness tool dispatch. The full OpenAI API is not implemented. Tool support requires a build from this source revision; v0.1.0 does not include it.
+Text chat completions, legacy completions, model listing, and SSE streaming are implemented. See [the API contract](docs/api.md) for supported fields and errors. Chat Completions also supports [client function tools](examples/tool-calling/README.md): your application executes the function and returns its result. Tool turns use a validated structured-output bridge, not native harness tool dispatch. The full OpenAI API is not implemented. Tool support is included in v0.1.1; v0.1.0 does not include it.
 
 ## Keys and permissions
 
@@ -209,7 +209,7 @@ The probe makes one model call using your existing Codex login. Normal tests use
 
 Add harnesses by implementing [`harness::Adapter`](src/harness/mod.rs), registering the adapter in the CLI, and testing its official output protocol. The HTTP and key layers stay unchanged.
 
-`scripts/release.sh v0.1.0` packages the host binary and its SHA-256 checksum; pass a Rust target triple as the second argument to select another target with a configured linker. The GitHub workflow builds and tests six targets (macOS/Linux/Windows × arm64/amd64) on native runners when an approved version tag is pushed. See [release build instructions](docs/distribution.md).
+`scripts/release.sh v0.1.1` packages the host binary and its SHA-256 checksum; pass a Rust target triple as the second argument to select another target with a configured linker. The GitHub workflow builds and tests six targets (macOS/Linux/Windows × arm64/amd64) on native runners when an approved version tag is pushed. See [release build instructions](docs/distribution.md).
 
 MIT licensed. Independent project; not affiliated with OpenAI or Google.
 

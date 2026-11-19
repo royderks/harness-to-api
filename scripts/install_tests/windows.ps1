@@ -9,7 +9,7 @@ try {
     & ([scriptblock]::Create((Get-Content -Raw $installer)))
     $binary = Join-Path $env:H2A_INSTALL_DIR 'h2a.exe'
     $version = & $binary version
-    if ($LASTEXITCODE -ne 0 -or $version -ne 'v0.1.0') { throw 'Installed binary version failed' }
+    if ($LASTEXITCODE -ne 0 -or $version -ne 'v0.1.1') { throw 'Installed binary version failed' }
     $original = (Get-FileHash $binary).Hash
     # A repeat install must replace an existing executable successfully.
     & ([scriptblock]::Create((Get-Content -Raw $installer)))
